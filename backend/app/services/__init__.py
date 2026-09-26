@@ -1,3 +1,4 @@
+from app.services.anomaly_service import AnomalyService
 from app.services.baseline_service import BaselineService
 from app.services.event_service import (
     EventNotFoundError,
@@ -12,4 +13,5 @@ __all__ = [
     "ZoneNotFoundError",
     "EventNotFoundError",
     "BaselineService",
+    "AnomalyService",
 ]
