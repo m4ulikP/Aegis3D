@@ -38,8 +38,6 @@ Aegis3D is a Smart PZT-Based Structural Health Monitoring & Early-Warning System
 - PostgreSQL database
 - Next.js / React / TypeScript dashboard frontend
 
-*No machine learning is used in the current MVP.*  
-*No IMU or temperature/humidity sensing is included in the current MVP.*
 
 ---
 
@@ -56,14 +54,6 @@ Aegis3D is a Smart PZT-Based Structural Health Monitoring & Early-Warning System
 
 ---
 
-### Team Ownership
-
-- **Maulik Pandey**: Backend + system integration
-- **Madhav Kumar**: Backend + signal processing + validation
-- **Shikhar Sadhu**: Frontend + hardware/firmware integration
-- **Pratyush Bhaskar Ram**: Frontend + visualization
-
----
 
 ### Development Status
 
