@@ -1,3 +1,4 @@
+from app.services.baseline_service import BaselineService
 from app.services.event_service import (
     EventNotFoundError,
     EventService,
@@ -10,4 +11,5 @@ __all__ = [
     "SessionNotFoundError",
     "ZoneNotFoundError",
     "EventNotFoundError",
+    "BaselineService",
 ]
