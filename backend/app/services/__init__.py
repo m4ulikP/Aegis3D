@@ -7,6 +7,7 @@ from app.services.event_service import (
     SessionNotFoundError,
     ZoneNotFoundError,
 )
+from app.services.health_service import HealthService
 from app.services.trend_service import TrendService
 
 __all__ = [
@@ -18,5 +19,7 @@ __all__ = [
     "AnomalyService",
     "CorrelationService",
     "TrendService",
+    "HealthService",
 ]
+
 
