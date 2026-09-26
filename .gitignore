@@ -39,3 +39,6 @@ desktop.ini
 .mypy_cache/
 .coverage
 htmlcov/
+*.db
+*.sqlite3
+
