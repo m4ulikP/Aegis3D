@@ -51,8 +51,8 @@ Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
 | **FastAPI REST Foundation** | **Implemented** | API foundation with liveness `/health` and DB readiness `/health/db` endpoints (`backend/app/api/routes/health.py`) |
 | **Event Ingestion API** | **Implemented** | `POST /api/v1/events` and `GET /api/v1/events/{id}` with validation & service orchestration (`backend/app/api/routes/events.py`) |
 | **Signal Processing Engine** | **Implemented** | Mean-subtraction DC offset removal, moving average, Butterworth lowpass filtering, event window detection, and FFT feature extraction (`backend/app/processing/`) |
-| **Statistical Baseline Engine** | **Implemented** | Zone-specific historical baseline calculation ($\mu, \sigma$ for magnitude & energy, normal rate, min-data validation) (`backend/app/baseline/`) |
-| **Rule-Based Anomaly Engine** | **Implemented** | Z-score deviation comparison ($|z| \ge 3.0\sigma$), zero-variance baseline handling, and evidence generation (`backend/app/anomaly/`) |
+| **Statistical Baseline Engine** | **Implemented** | Zone-specific historical baseline calculation (mean and standard deviation for magnitude & energy, normal rate, min-data validation) (`backend/app/baseline/`) |
+| **Rule-Based Anomaly Engine** | **Implemented** | Z-score deviation comparison (`|z| >= 3.0` sigma), zero-variance baseline handling, and evidence generation (`backend/app/anomaly/`) |
 | **Temporal Persistence** | **Implemented** | Rolling window persistence evaluation, anomaly ratio, consecutive anomalies, and window boundary checks (`backend/app/correlation/temporal.py`) |
 | **Two-PZT Event Correlation** | **Implemented** | Cross-sensor event correlation across 25ms tolerance, TDOA spread, and relative source indication (`backend/app/correlation/sensor_correlation.py`) |
 | **Evidence Aggregation** | **Implemented** | Unified classification (`NORMAL_OBSERVATION` to `PERSISTENT_AND_CROSS_SENSOR_CORRELATED`) (`backend/app/correlation/evidence.py`) |
@@ -85,10 +85,10 @@ Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
 [ 4. Feature Extraction ] ─────────► Peak amplitude, RMS amplitude, Discrete Signal Energy, FFT Dominant Frequency
                  │
                  ▼
-[ 5. Statistical Baseline ] ───────► Zone-specific historical mean (μ) & standard deviation (σ) for magnitude & energy
+[ 5. Statistical Baseline ] ───────► Zone-specific historical mean & standard deviation for magnitude & energy
                  │
                  ▼
-[ 6. Anomaly Detection ] ──────────► Rule-based standardized deviation (|z| >= 3.0σ) & zero-variance handling
+[ 6. Anomaly Detection ] ──────────► Rule-based standardized deviation (|z| >= 3.0 sigma) & zero-variance handling
                  │
                  ▼
 [ 7. Temporal Persistence ] ───────► Rolling observation window (300s), anomaly ratio, max consecutive anomalies
@@ -114,41 +114,49 @@ Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
 ## Detailed Component Specifications
 
 ### 1. Signal Processing Foundation (`backend/app/processing/`)
-- **`SampledSignal`**: Immutable 1D signal container enforcing positive sample rates ($f_s > 0$) and validating against `NaN`/`Inf`.
+- **`SampledSignal`**: Immutable 1D signal container enforcing positive sample rates (`sample_rate > 0`) and validating against `NaN`/`Inf`.
 - **Preprocessing**: Mean-subtraction DC offset removal preserving signal metadata.
 - **Filtering**: Moving average filter (`mode="same"`) and Butterworth lowpass filter (`scipy.signal.butter` / `filtfilt`) with Nyquist boundary checks.
 - **Event Detection**: Amplitude thresholding identifying active sample windows, filtering transient noise (`min_duration_samples`), and merging sub-threshold gaps (`merge_gap_samples`).
 - **Feature Extraction**:
-  - **Peak Amplitude**: $\max(|x[n]|)$
-  - **RMS Amplitude**: $\sqrt{\frac{1}{N} \sum x[n]^2}$
-  - **Discrete Signal Energy**: $\sum x[n]^2$ (*Note: Digital signal metric, not physical joules*)
+  - **Peak Amplitude**: `max(|x[n]|)`
+  - **RMS Amplitude**: Root Mean Square of sampled amplitudes
+  - **Discrete Signal Energy**: `sum(x[n]^2)` (*Note: Digital signal metric, not physical joules*)
   - **Duration & Sample Count**: Window duration in milliseconds and sample count.
   - **Dominant Frequency**: Real FFT spectrum analysis (`np.fft.rfft`) with zero-padding and DC bin exclusion.
 
 ### 2. Zone Statistical Baseline Engine (`backend/app/baseline/`)
 - Computes zone-specific historical baseline parameters over a date window `[valid_from, valid_until]`.
-- Calculates arithmetic mean ($\mu$) and population standard deviation ($\sigma$, `ddof=0`) for event magnitude and signal energy.
+- Calculates arithmetic mean and population standard deviation (`ddof=0`) for event magnitude and signal energy.
 - Calculates normal historical event rate (events per second).
 - Requires minimum qualifying events (`DEFAULT_MIN_EVENTS = 10`) and excludes `DISMISSED` events.
 
 ### 3. Rule-Based Anomaly Detection (`backend/app/anomaly/`)
-- Computes standardized $z$-scores:
-  $$z_{\text{mag}} = \frac{\text{magnitude} - \mu_{\text{mag}}}{\sigma_{\text{mag}}}, \quad z_{\text{eng}} = \frac{\text{energy} - \mu_{\text{eng}}}{\sigma_{\text{eng}}}$$
-- Evaluates absolute deviation against configurable threshold ($|z| \ge 3.0\sigma$).
+- Computes standardized z-scores for magnitude and energy:
+  ```text
+  z_magnitude = (magnitude - mean_magnitude) / std_magnitude
+  z_energy    = (energy - mean_energy) / std_energy
+  ```
+- Evaluates absolute deviation against configurable threshold (`|z| >= 3.0` sigma).
 - Evaluates magnitude and energy independently (`is_anomalous = mag_anomalous or eng_anomalous`).
-- **Zero-Standard-Deviation Handling**: When baseline standard deviation is zero ($\sigma = 0$):
+- **Zero-Standard-Deviation Handling**: When baseline standard deviation is zero (`std = 0`):
   - Event value equals mean $\implies z = 0.0$, normal.
   - Event value differs from mean $\implies z = 0.0$, flagged anomalous with explainable zero-variance evidence.
   - Strictly avoids `NaN`, `infinity`, or division-by-zero errors.
 
 ### 4. Temporal Persistence Evaluation (`backend/app/correlation/temporal.py`)
 - Evaluates anomaly sequence over a rolling observation window (default `300.0` seconds).
-- Computes total events, anomalous events, anomaly ratio ($\frac{\text{anomalous}}{\text{total}}$), and max consecutive anomalous events.
-- Persistence satisfied when anomalous event count $\ge \text{min\_count}$ (default 3) AND anomaly ratio $\ge \text{min\_ratio}$ (default 0.50).
+- Computes total events, anomalous events, anomaly ratio (`anomalous events / total events`), and max consecutive anomalous events.
+- Persistence satisfied when BOTH conditions hold:
+  ```text
+  anomalous event count >= min_count (default: 3)
+  AND
+  anomaly ratio >= min_ratio (default: 0.50)
+  ```
 
 ### 5. Two-PZT Sensor Event Correlation (`backend/app/correlation/sensor_correlation.py`)
 - Correlates events across two distinct PZT sensors within a configurable temporal tolerance window (default `25` ms).
-- Computes temporal spread in milliseconds ($\Delta t = |t_2 - t_1|$) and relative arrival time difference.
+- Computes temporal spread in milliseconds (`delta_t = |t2 - t1|`) and relative arrival time difference.
 - Generates relative source indication hints (e.g. `"Event arrived first at sensor PZT-01 (lead time: 4.20 ms relative to PZT-02)"`).
 - *Note*: Provides relative source arrival order along a 2-sensor axis, **NOT** precise 2D or 3D spatial triangulation.
 
@@ -164,18 +172,20 @@ Aggregates anomaly, persistence, and correlation into standardized classificatio
 - Divides a configurable analysis window (default `3600.0` seconds) into two contiguous sub-periods:
   - **Earlier Sub-Period**: `[window_start, midpoint)`
   - **Later Sub-Period**: `[midpoint, window_end]`
-- Calculates normalized anomaly rate ($\frac{\text{anomalous}}{\text{total}}$) for each sub-period and computes delta ($\Delta_{\text{rate}} = \text{rate}_{\text{later}} - \text{rate}_{\text{earlier}}$).
+- Calculates normalized anomaly rate (`anomalous events / total events`) for each sub-period and computes delta (`rate_delta = rate_later - rate_earlier`).
 - Evaluates directional trend classification:
-  - `INCREASING`: Anomaly rate delta $\ge \text{threshold}$ (default 0.10) or magnitude/evidence rising.
+  - `INCREASING`: Anomaly rate delta `>= threshold` (default: 0.10) or magnitude/evidence rising.
   - `DECREASING`: Anomaly rate declining toward baseline.
   - `STABLE`: Anomaly rate and magnitude remain within tolerance.
-  - `INSUFFICIENT_DATA`: Fewer than `min_events_per_period` (default 2) in either sub-period. *Preserves data uncertainty without artificial penalties.*
+  - `INSUFFICIENT_DATA`: Fewer than `min_events_per_period` (default: 2) in either sub-period. *Preserves data uncertainty without artificial penalties.*
 - Identifies and documents divergent component trends (e.g. rate increasing while magnitude decreases).
 
 ### 8. Structural Health Indicator (SHI) (`backend/app/health/`)
-- Converts accumulated evidence from Steps 7–9 into a deterministic prototype score bounded strictly in $[0.0, 100.0]$:
-  $$\text{raw\_score} = \text{base\_score} - (\text{anomaly\_penalty} + \text{persistence\_penalty} + \text{cross\_sensor\_penalty} + \text{trend\_penalty})$$
-  $$\text{score} = \max(0.0, \min(100.0, \text{raw\_score}))$$
+- Converts accumulated evidence from Steps 7–9 into a deterministic prototype score bounded strictly to the range `0–100`:
+  ```text
+  raw_score = base_score - (anomaly_penalty + persistence_penalty + cross_sensor_penalty + trend_penalty)
+  score = clamp(raw_score, 0, 100)
+  ```
 - Default prototype configuration:
   - `base_score = 100.0`
   - `anomaly_penalty = 15.0` (applied for individual anomaly activity)
@@ -183,10 +193,10 @@ Aggregates anomaly, persistence, and correlation into standardized classificatio
   - `cross_sensor_penalty = 25.0` (applied for Step 8 cross-sensor correlation)
   - `increasing_trend_penalty = 15.0` (applied for Step 9 `INCREASING` trend)
 - Prototype Status Mapping:
-  - $\text{score} \ge 90.0 \implies$ `HealthStatus.NORMAL`
-  - $70.0 \le \text{score} < 90.0 \implies$ `HealthStatus.MONITOR`
-  - $45.0 \le \text{score} < 70.0 \implies$ `HealthStatus.INSPECTION_ADVISED`
-  - $\text{score} < 45.0 \implies$ `HealthStatus.HIGH_PRIORITY_INSPECTION`
+  - `score >= 90.0` $\implies$ `HealthStatus.NORMAL`
+  - `70.0 <= score < 90.0` $\implies$ `HealthStatus.MONITOR`
+  - `45.0 <= score < 70.0` $\implies$ `HealthStatus.INSPECTION_ADVISED`
+  - `score < 45.0` $\implies$ `HealthStatus.HIGH_PRIORITY_INSPECTION`
 - *Note*: Score boundaries and penalty weights are prototype monitoring parameters, NOT certified structural safety thresholds.
 
 ---
@@ -342,7 +352,7 @@ Aegis3D validates algorithm behavior using synthetic, imported, and controlled s
 ### Planned Physical Benchtop Metrics
 As physical hardware coupling progresses, Aegis3D will evaluate:
 - **Event Detection Latency**: Processing time from raw sample ingestion to backend anomaly & health result.
-- **False Positive Separation**: Statistical separation ($\Delta z$) between normal baseline noise and true anomaly events.
+- **False Positive Separation**: Statistical separation (`delta_z`) between normal baseline noise and true anomaly events.
 - **TDOA Arrival Accuracy**: Precision of relative arrival time lead/lag estimation between 2 PZT sensors.
 
 ---
@@ -355,8 +365,8 @@ As physical hardware coupling progresses, Aegis3D will evaluate:
 - [x] **Step 3**: FastAPI REST foundation & health endpoints
 - [x] **Step 4**: Event ingestion REST API (`POST /api/v1/events`)
 - [x] **Step 5**: Signal processing engine (DC offset, Butterworth filtering, windowing, FFT extraction)
-- [x] **Step 6**: Zone statistical baseline engine ($\mu, \sigma$, event rate)
-- [x] **Step 7**: Rule-based z-score anomaly detection engine ($|z| \ge 3.0\sigma$, zero-variance handling)
+- [x] **Step 6**: Zone statistical baseline engine (mean, standard deviation, event rate)
+- [x] **Step 7**: Rule-based z-score anomaly detection engine (`|z| >= 3.0` sigma, zero-variance handling)
 - [x] **Step 8**: Temporal persistence evaluation, 2-PZT cross-sensor correlation & evidence aggregation
 - [x] **Step 9**: Deterministic zone trend analysis engine (`STABLE`, `INCREASING`, `DECREASING`, `INSUFFICIENT_DATA`)
 - [x] **Step 10**: Deterministic Structural Health Indicator (SHI 0–100 score, itemized deductions, `HealthSnapshot`)
