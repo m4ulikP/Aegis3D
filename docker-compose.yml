@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: aegis3d_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aegis3d
+      POSTGRES_USER: aegis_user
+      POSTGRES_PASSWORD: aegis_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mqtt_broker:
+    image: eclipse-mosquitto:2
+    container_name: aegis3d_mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+
+volumes:
+  postgres_data:
+  mosquitto_data:
+  mosquitto_log:
