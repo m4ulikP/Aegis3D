@@ -1,0 +1,41 @@
+{
+  "ifc_schema": "IFC4",
+  "building": {
+    "guid": "3bmyaIWCvEHufVx1c33vn1",
+    "name": ""
+  },
+  "storeys": [
+    {
+      "guid": "0cyJyJpgz269aC2ZMeIyS8",
+      "name": "Sub Level",
+      "elevation_mm": -2499.9999999999995
+    },
+    {
+      "guid": "35r2O_4kTAf8AbYFs_VCl2",
+      "name": "01 - Entry Level",
+      "elevation_mm": 0.0
+    },
+    {
+      "guid": "35r2O_4kTAf8AbYFs_VCl1",
+      "name": "02 - Floor",
+      "elevation_mm": 3800.000000001158
+    },
+    {
+      "guid": "35r2O_4kTAf8AbYFs_VCl0",
+      "name": "03 - Floor",
+      "elevation_mm": 7599.999999999942
+    },
+    {
+      "guid": "35r2O_4kTAf8AbYFs_VCk$",
+      "name": "Roof",
+      "elevation_mm": 11399.999999999942
+    }
+  ],
+  "component_counts": {
+    "IfcColumn": 203,
+    "IfcBeam": 371,
+    "IfcSlab": 299,
+    "IfcWall": 6
+  },
+  "total_structural_components": 879
+}
