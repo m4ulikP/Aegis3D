@@ -41,4 +41,6 @@ desktop.ini
 htmlcov/
 *.db
 *.sqlite3
+*.png
+data/processed/
 
