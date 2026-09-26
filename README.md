@@ -8,7 +8,7 @@
 - **Pratyush Bhaskar Ram**
 - **Madhav Kumar**
 
-**MAITRON 2026** | **Hardware Track**  
+**MAITRON 2026** | **Software Track**  
 **Primary SDG**: SDG 11 — Sustainable Cities and Communities  
 **Secondary SDG**: SDG 9 — Industry, Innovation and Infrastructure
 
@@ -16,17 +16,28 @@
 
 ## Overview
 
-**Aegis3D** is a hardware-track Structural Health Monitoring (SHM) and early-warning prototype designed to observe structural acoustic and elastic wave activity in buildings and infrastructure. By capturing piezoelectric sensor signals and processing them through a deterministic, hardware-agnostic signal processing and statistical analysis pipeline, Aegis3D establishes zone-specific baseline behavior and identifies anomalous structural events to flag locations requiring physical inspection.
+**Aegis3D** is a software-centric structural health monitoring (SHM) and early-warning platform with an optional physical piezoelectric transducer (PZT) sensing layer. The platform observes structural acoustic and elastic wave activity in buildings and infrastructure to detect anomalous behavior and flag specific locations requiring physical inspection.
 
-> **Crucial Disclaimer**: Aegis3D is a continuous monitoring and early-warning aid. It does **NOT** use machine learning inference, predict structural collapse, guarantee disaster prevention, replace licensed structural engineers, or provide certified safety assessments. Piezoelectric Transducers (PZTs) detect acoustic, mechanical, and elastic wave events within materials; they do not directly "see" cracks. Human engineering inspection remains mandatory for actual structural assessment.
+While PZT sensors and ESP32 microcontrollers form the physical sensing input layer, the core innovation and execution of Aegis3D are software-driven. The backend performs deterministic signal processing, noise filtering, event window detection, feature extraction, statistical baseline calculation, and rule-based anomaly detection. The architecture remains hardware-agnostic throughout: the software platform functions seamlessly whether fed by live ESP32 microcontrollers, recorded sensor datasets, or simulated signal sources.
+
+> **Crucial Technical Disclaimer**: Aegis3D is a continuous monitoring and early-warning software platform. It does **NOT** use machine learning inference, predict structural collapse, guarantee disaster prevention, replace licensed structural engineers, or provide certified engineering safety assessments. Piezoelectric Transducers (PZTs) capture acoustic, mechanical, and elastic stress waves within materials; they do not directly "see" cracks. Human engineering inspection remains mandatory for actual structural diagnosis.
+
+---
+
+## Role of Hardware in a Software-First Architecture
+
+Aegis3D treats hardware strictly as an optional data ingestion source rather than the core system:
+- **Input Mechanism**: Physical PZT sensors and ESP32 microcontrollers serve as data collection nodes feeding voltage samples into the software pipeline.
+- **Hardware-Agnostic Processing Engine**: All core algorithms—DC offset removal, Butterworth filtering, FFT spectral analysis, baseline generation, and z-score anomaly detection—are pure, hardware-independent software modules.
+- **Data Source Versatility**: Aegis3D evaluates signal inputs from physical sensor streams, imported historical sensor logs, or synthetic simulator engines with zero changes to the underlying processing logic.
 
 ---
 
 ## Key Design Principles
 
-1. **Hardware Independence**: Core signal processing, baseline calculation, and anomaly detection engines remain pure, deterministic Python modules completely decoupled from specific microcontrollers, sensor models, or database ORMs.
+1. **Software-Centric & Hardware-Agnostic**: Core signal processing, baseline calculation, and anomaly detection engines remain pure, deterministic Python modules completely decoupled from specific microcontrollers, sensor hardware, or database ORMs.
 2. **Zero Machine Learning**: Aegis3D deliberately uses deterministic signal processing, mathematical feature extraction, standard deviation metrics, and rule-based statistical thresholds instead of black-box AI/ML models.
-3. **Explainable Evidence**: All anomaly flags produce human-readable, auditable evidence strings (e.g. z-score deviations) explaining exactly why an event was flagged relative to a zone's baseline.
+3. **Explainable Evidence**: All anomaly flags produce human-readable, auditable evidence strings (e.g. z-score deviations) explaining exactly why an event was flagged relative to a zone's statistical baseline.
 4. **Relational Domain Integrity**: Standardized PostgreSQL persistence layer storing structural zones, sessions, events, baselines, health snapshots, and alerts with strict foreign key constraints.
 
 ---
@@ -47,64 +58,50 @@
 | **Next.js Dashboard** | *Scaffolded* | Visual interface structure (`frontend/`) |
 | **ESP32 Firmware** | *Scaffolded* | PlatformIO structure for ADC sampling & MQTT (`firmware/esp32/`) |
 | **Hardware PCB & Schematics** | *Scaffolded* | Schematic & PCB layout documentation (`hardware/`) |
-| **Temporal & Trend Analysis** | *Planned* | Multi-event trend analysis over observation windows (Phase 2) |
-| **Two-PZT Event Correlation** | *Planned* | Cross-sensor event matching & relative source indication (Phase 2) |
+| **Temporal Persistence** | *Planned* | Multi-event temporal tracking over observation windows (Phase 3) |
+| **Two-PZT Event Correlation** | *Planned* | Cross-sensor event matching & relative source indication (Phase 3) |
 | **Structural Health Indicator** | *Planned* | Zone health scoring and alert escalation rules (Phase 3) |
+| **Physical PZT Sensor Setup** | *Planned* | Benchtop validation with physical sensor hardware (Phase 4) |
 
 ---
 
-## System & Processing Pipeline Architecture
+## System Architecture & Processing Pipeline
 
-### Current Processing Pipeline
-
-```text
-[ Physical PZT Sensors (2x Array) ]
-                │
-                ▼ (Mechanical / Elastic Acoustic Waves)
-[ Analog Signal Conditioning (Amp / Filter) ]
-                │
-                ▼ (Conditioned Voltage Signal)
-[ ESP32 ADC Sampling ]
-                │
-                ▼ (Digital Signal Packets)
-[ Wi-Fi / MQTT Transport ]
-                │
-                ▼
-┌─────────────────────────────────────────────────────────┐
-│ Backend Signal Processing Pipeline (backend/app/)       │
-│                                                         │
-│ 1. Raw Sampled Signal Representation (SampledSignal)    │
-│ 2. DC Offset Removal (Mean Subtraction)                │
-│ 3. Butterworth Lowpass Filtering (scipy.signal)         │
-│ 4. Event Detection (Threshold & Window Windowing)       │
-│ 5. Feature Extraction (Peak, RMS, Energy, FFT Freq)     │
-└──────────────────────────┬──────────────────────────────┘
-                           │ (Extracted Features)
-                           ▼
-┌─────────────────────────────────────────────────────────┐
-│ Baseline & Anomaly Intelligence Layer                   │
-│                                                         │
-│ 1. Zone-Specific Historical Baseline (Mean & Std Dev)   │
-│ 2. Z-Score Deviation Comparison (|z| >= 3.0σ Threshold)  │
-│ 3. Rule-Based Anomaly Decision & Explainable Evidence   │
-└──────────────────────────┬──────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────┐
-│ Persistence & API Layer                                 │
-│                                                         │
-│ 1. PostgreSQL Relational Database (SQLAlchemy 2.0)       │
-│ 2. FastAPI REST Interface (POST/GET /api/v1/events)     │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Planned Future Pipeline Expansion
+### End-to-End Processing Architecture
 
 ```text
-[ Anomaly Evidence ] ──► [ Temporal Trend Engine ] ──► [ Multi-PZT Correlation ]
-                                                              │
-                                                              ▼
-[ Web Dashboard ] ◄── [ Alert Escalation ] ◄── [ Structural Health Indicator ]
+[ Signal Input Source ]
+  (Physical PZT Sensors / Historical Logs / Synthetic Simulator)
+                 │
+                 ▼
+[ Signal Input Adapter / Ingestion API ]
+                 │
+                 ▼
+[ Signal Processing Engine ]
+  ├── 1. Raw Sampled Signal Representation (SampledSignal)
+  ├── 2. DC Offset Removal (Mean Subtraction)
+  ├── 3. Butterworth Lowpass Filtering (scipy.signal)
+  ├── 4. Event Window Detection (Thresholding & Windowing)
+  └── 5. Feature Extraction (Peak, RMS, Energy, FFT Frequency)
+                 │
+                 ▼ (Extracted Numerical Features)
+[ Zone-Specific Statistical Baseline Engine ]
+  └── Calculates Historical Mean (μ) & Standard Deviation (σ)
+                 │
+                 ▼
+[ Rule-Based Anomaly Detection Engine ]
+  ├── Evaluates Standardized Deviation (|z| >= 3.0σ Threshold)
+  ├── Zero-Variance Baseline Handling
+  └── Explaining Evidence Generation
+                 │
+                 ▼ (Planned / Phase 3)
+[ Temporal Persistence & Multi-PZT Correlation ]
+                 │
+                 ▼ (Planned / Phase 3)
+[ Trend Analysis & Structural Health Indicator ]
+                 │
+                 ▼ (Planned / Phase 4)
+[ Alert Escalation & Web Dashboard Interface ]
 ```
 
 ---
@@ -251,16 +248,16 @@ cd backend
 ## Validation Strategy & Metrics
 
 ### Testing Methodology
-Aegis3D uses synthetic and controlled signal datasets to validate algorithm performance before physical deployment:
+Aegis3D uses synthetic and controlled signal datasets to validate software algorithm performance before physical deployment:
 - **Healthy Baseline Datasets**: Low-amplitude background mechanical noise without burst events.
 - **External Environmental Noise Datasets**: Transient non-structural impacts (e.g., footsteps, door slams).
 - **Controlled Structural/Mechanical Event Datasets**: High-amplitude burst signals simulating mechanical stress wave releases.
 
 ### Future Validation Evaluation Metrics
-As physical hardware and multi-sensor correlation are integrated, Aegis3D will evaluate:
+As multi-sensor correlation and physical hardware are integrated, Aegis3D will evaluate:
 - **Event Detection Rate**: Ratio of detected acoustic burst events versus injected synthetic events.
 - **False Positive Rate**: Percentage of non-structural environmental noise spikes incorrectly flagged as anomalous.
-- **Detection Latency**: End-to-end processing time from ESP32 ADC sampling to backend anomaly result generation.
+- **Detection Latency**: End-to-end processing time from signal input to backend anomaly result generation.
 - **Anomaly Score Separation**: Statistical separation ($\Delta z$) between normal baseline fluctuations and anomalous stress events.
 - **Relative Localization Error**: Difference between estimated relative event region and actual PZT sensor arrival time difference (TDOA).
 
@@ -269,9 +266,9 @@ As physical hardware and multi-sensor correlation are integrated, Aegis3D will e
 ## Current Technical Limitations
 
 1. **Indirect Measurement**: Piezoelectric transducers measure elastic and mechanical stress waves propagating through materials. They do not directly photograph or measure physical crack dimensions.
-2. **Sensor Mounting & Coupling**: Sensor coupling, mounting adhesive, and physical contact pressure significantly affect frequency response and signal amplitude.
+2. **Sensor Mounting & Coupling**: Physical sensor coupling, mounting adhesive, and contact pressure affect frequency response and signal amplitude during physical testing.
 3. **Zone Variability**: Material composition, geometry, and mechanical loads vary significantly between building zones.
-4. **Environmental Interference**: Heavy machinery, foot traffic, or door closures can generate acoustic signals that require baseline calibration to prevent false positives.
+4. **Environmental Interference**: Heavy machinery, foot traffic, or door closures can generate acoustic signals requiring baseline calibration to prevent false positives.
 5. **Historical Baseline Dependency**: Statistical baseline calculation requires a minimum of 10 representative historical events per zone.
 6. **Two-Sensor Spatial Limits**: A two-sensor setup enables relative time-of-arrival correlation along a single linear axis, but cannot perform full 3D spatial triangulation.
 7. **Non-Certified Assessment**: Rule-based statistical anomaly detection is a structural health monitoring aid, not a certified structural engineering safety rating.
@@ -279,30 +276,30 @@ As physical hardware and multi-sensor correlation are integrated, Aegis3D will e
 
 ---
 
-## Development Roadmap
+## Software-First Development Roadmap
 
-### Phase 1: Core Backend & Statistical Foundation (**Completed**)
-- [x] PostgreSQL persistence schema & Alembic migrations
+### Phase 1 — Software Foundation (**Completed**)
+- [x] Domain models & PostgreSQL persistence schema
+- [x] Alembic database migrations
 - [x] FastAPI server foundation & Health endpoints
-- [x] Event ingestion REST API
-- [x] Hardware-agnostic signal processing pipeline (filtering, window detection, FFT feature extraction)
-- [x] Zone-specific statistical baseline engine
-- [x] Deterministic rule-based $z$-score anomaly detection engine
+- [x] Event ingestion REST API (`POST /api/v1/events`)
 
-### Phase 2: Temporal & Multi-Sensor Intelligence (**Next Milestone**)
+### Phase 2 — Signal Intelligence (**Completed**)
+- [x] Hardware-agnostic signal processing pipeline (filtering, window detection, FFT feature extraction)
+- [x] Zone-specific statistical baseline engine ($\mu, \sigma$, event rate)
+- [x] Deterministic rule-based $z$-score anomaly detection engine ($|z| \ge 3.0\sigma$)
+- [x] Executable signal processing visualization tool
+
+### Phase 3 — Advanced Structural Intelligence (**Next Milestone**)
 - [ ] Multi-event temporal persistence tracking
 - [ ] Two-PZT time-difference-of-arrival (TDOA) event correlation
-- [ ] Relative source indication / approximate affected region mapping
+- [ ] Relative source indication & approximate affected region mapping
 - [ ] Event frequency & energy trend analysis over time
-
-### Phase 3: Health Indicator & Escalation
 - [ ] Zone Structural Health Indicator (0–100 prototype monitoring score)
 - [ ] Multi-level alert escalation engine
-- [ ] Next.js real-time monitoring dashboard interface
-- [ ] Historical trends and baseline visualization charts
 
-### Phase 4: Hardware & Live Deployment
-- [ ] ESP32 PlatformIO ADC sampling firmware completion
+### Phase 4 — Interface & Optional Physical Integration (**Future Milestone**)
+- [ ] Next.js real-time monitoring dashboard interface
 - [ ] MQTT broker live message ingestion adapter
-- [ ] Physical 2-PZT sensor conditioning circuit prototype
-- [ ] Benchtop validation on physical concrete/steel structural element
+- [ ] ESP32 PlatformIO ADC sampling firmware completion
+- [ ] Physical 2-PZT sensor prototype & controlled physical validation
