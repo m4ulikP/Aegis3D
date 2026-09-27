@@ -1,3 +1,14 @@
+import {
+    AlertResponse,
+    EventResponse,
+    HealthSummaryResponse,
+    ZoneCorrelationResponse,
+    ZoneDetailResponse,
+    ZoneHealthResponse,
+    ZoneResponse,
+    ZoneTrendResponse,
+} from "@/types/api";
+
 const API_BASE = "/api/v1";
 
 async function apiFetch<T>(
@@ -31,27 +42,27 @@ async function apiFetch<T>(
 }
 
 export const api = {
-    getHealthSummary: () =>
-        apiFetch("/health/summary"),
+    getHealthSummary: (): Promise<HealthSummaryResponse> =>
+        apiFetch<HealthSummaryResponse>("/health/summary"),
 
-    getZones: () =>
-        apiFetch("/zones"),
+    getZones: (): Promise<ZoneResponse[]> =>
+        apiFetch<ZoneResponse[]>("/zones"),
 
-    getZone: (zoneId: number) =>
-        apiFetch(`/zones/${zoneId}`),
+    getZone: (zoneId: number): Promise<ZoneDetailResponse> =>
+        apiFetch<ZoneDetailResponse>(`/zones/${zoneId}`),
 
-    getZoneHealth: (zoneId: number) =>
-        apiFetch(`/zones/${zoneId}/health`),
+    getZoneHealth: (zoneId: number): Promise<ZoneHealthResponse> =>
+        apiFetch<ZoneHealthResponse>(`/zones/${zoneId}/health`),
 
-    getZoneTrend: (zoneId: number) =>
-        apiFetch(`/zones/${zoneId}/trend`),
+    getZoneTrend: (zoneId: number): Promise<ZoneTrendResponse> =>
+        apiFetch<ZoneTrendResponse>(`/zones/${zoneId}/trend`),
 
-    getZoneCorrelation: (zoneId: number) =>
-        apiFetch(`/zones/${zoneId}/correlation`),
+    getZoneCorrelation: (zoneId: number): Promise<ZoneCorrelationResponse> =>
+        apiFetch<ZoneCorrelationResponse>(`/zones/${zoneId}/correlation`),
 
-    getZoneEvents: (zoneId: number) =>
-        apiFetch(`/zones/${zoneId}/events`),
+    getZoneEvents: (zoneId: number): Promise<EventResponse[]> =>
+        apiFetch<EventResponse[]>(`/zones/${zoneId}/events`),
 
-    getAlerts: () =>
-        apiFetch("/alerts"),
+    getAlerts: (): Promise<AlertResponse[]> =>
+        apiFetch<AlertResponse[]>("/alerts"),
 };
