@@ -1,0 +1,1313 @@
+{
+  "schema_version": "1.0",
+  "mapping_type": "inferred_spatial_group",
+  "description": "Prototype mapping between backend monitoring Zones and logical BIM component groups.",
+  "disclaimer": "This is an inferred prototype mapping for visualization. It does not establish verified physical component identity or structural damage.",
+  "building": {
+    "building_guid": "3bmyaIWCvEHufVx1c33vn1",
+    "building_name": "",
+    "ifc_schema": "IFC4"
+  },
+  "zones": [
+    {
+      "zone_id": 1,
+      "zone_name": "Zone 1 - Main Deck Girder",
+      "mapping_confidence": "inferred",
+      "mapping_rule": {
+        "storey_name": "02 - Floor",
+        "storey_guid": "35r2O_4kTAf8AbYFs_VCl1",
+        "component_type": "IfcBeam"
+      },
+      "rationale": "Backend Zone 1 floor is designated as 'Level 2'. The BIM model contains Storey '02 - Floor' at elevation 3800mm. While the backend demo zone name refers to a 'Main Deck Girder', the BIM model contains a framed floor system with 133 IfcBeam elements rather than an explicit bridge girder. The mapping rule selects the complete spatial group of 133 IfcBeam elements on Storey '02 - Floor' as the logical representative structural group.",
+      "expected_component_count": 133,
+      "resolved_component_count": 133,
+      "unresolved_component_count": 0,
+      "components": [
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ382",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:124614",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124614"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38C",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:124616",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124616"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38Q",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:124638",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124638"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38X",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:124645",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124645"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38Z",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:124647",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124647"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38f",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:124653",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124653"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38h",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:124655",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124655"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38r",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:124657",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124657"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38t",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:124659",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124659"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38n",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:124661",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124661"
+        },
+        {
+          "ifc_guid": "2s$U3rTsz2Ag8ZA65PVR4O",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:128213",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:128213"
+        },
+        {
+          "ifc_guid": "2s$U3rTsz2Ag8ZA65PVR35",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:128264",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:128264"
+        },
+        {
+          "ifc_guid": "2s$U3rTsz2Ag8ZA65PVR3p",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:128318",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:128318"
+        },
+        {
+          "ifc_guid": "2s$U3rTsz2Ag8ZA65PVR2L",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:128344",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:128344"
+        },
+        {
+          "ifc_guid": "2s$U3rTsz2Ag8ZA65PVR2v",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:128372",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:128372"
+        },
+        {
+          "ifc_guid": "2s$U3rTsz2Ag8ZA65PVR10",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:128397",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:128397"
+        },
+        {
+          "ifc_guid": "2s$U3rTsz2Ag8ZA65PVR1z",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:128432",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:128432"
+        },
+        {
+          "ifc_guid": "2s$U3rTsz2Ag8ZA65PVR0K",
+          "name": "M_Concrete-Rectangular Beam:300 x 600mm:128473",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:128473"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39B",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124559",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124559"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39H",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124565",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124565"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39S",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124568",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124568"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39V",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124571",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124571"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39Q",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124574",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124574"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39b",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124577",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124577"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39d",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124579",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124579"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39Y",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124582",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124582"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39j",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124585",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124585"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39l",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124587",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124587"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39g",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124590",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124590"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39q",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124592",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124592"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39s",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124594",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124594"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39o",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124598",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124598"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39y",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124600",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124600"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39_",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124602",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124602"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39u",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124604",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124604"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ39w",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124606",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124606"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ384",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124608",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124608"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ386",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124610",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124610"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ380",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124612",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124612"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ388",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124620",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124620"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38A",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124622",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124622"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38K",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124624",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124624"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38M",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124626",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124626"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38G",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124628",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124628"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38I",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124630",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124630"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38S",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124632",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124632"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38U",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124634",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124634"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38O",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124636",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124636"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38_",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124666",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124666"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ38v",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124669",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124669"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3F4",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124672",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124672"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3F6",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124674",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124674"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3F1",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124677",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124677"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3FC",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124680",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124680"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3F8",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124684",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124684"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3FA",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124686",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124686"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3FK",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124688",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124688"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3FM",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124690",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124690"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3FG",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124692",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124692"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3FI",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124694",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124694"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3FS",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124696",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124696"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3FU",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124698",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124698"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Fd",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124707",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124707"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3FX",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124709",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124709"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Fj",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124713",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124713"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Fl",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124715",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124715"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Fm",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124724",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124724"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Fo",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124726",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124726"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3F_",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124730",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124730"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Fu",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124732",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124732"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3E4",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124736",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124736"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3E2",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124742",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124742"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3ED",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124745",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124745"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3EF",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124747",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124747"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3E9",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124749",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124749"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3EB",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124751",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124751"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3EL",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124753",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124753"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3EN",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124755",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124755"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3EH",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124757",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124757"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3EJ",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124759",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124759"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3ET",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124761",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124761"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3EP",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124765",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124765"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3ER",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124767",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124767"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Eb",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124769",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124769"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Ed",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124771",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124771"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3EX",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124773",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124773"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3EZ",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124775",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124775"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Ej",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124777",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124777"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3El",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124779",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124779"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Eg",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124782",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124782"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3DC",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124808",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124808"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3DE",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124810",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124810"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3D8",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124812",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124812"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3DM",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124818",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124818"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3DG",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124820",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124820"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3DI",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:124822",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:124822"
+        },
+        {
+          "ifc_guid": "15kM$yjmD0FxNxtEUi7rVe",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:127484",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:127484"
+        },
+        {
+          "ifc_guid": "15kM$yjmD0FxNxtEUi7rVf",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:127485",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:127485"
+        },
+        {
+          "ifc_guid": "15kM$yjmD0FxNxtEUi7rVg",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:127486",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:127486"
+        },
+        {
+          "ifc_guid": "15kM$yjmD0FxNxtEUi7rG8",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:127516",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:127516"
+        },
+        {
+          "ifc_guid": "15kM$yjmD0FxNxtEUi7rG9",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:127517",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:127517"
+        },
+        {
+          "ifc_guid": "15kM$yjmD0FxNxtEUi7rGA",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:127518",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:127518"
+        },
+        {
+          "ifc_guid": "15kM$yjmD0FxNxtEUi7rH9",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:127581",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:127581"
+        },
+        {
+          "ifc_guid": "15kM$yjmD0FxNxtEUi7rHA",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:127582",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:127582"
+        },
+        {
+          "ifc_guid": "15kM$yjmD0FxNxtEUi7rHB",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:127583",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:127583"
+        },
+        {
+          "ifc_guid": "15kM$yjmD0FxNxtEUi7rIr",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:127649",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:127649"
+        },
+        {
+          "ifc_guid": "15kM$yjmD0FxNxtEUi7rIs",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:127650",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:127650"
+        },
+        {
+          "ifc_guid": "15kM$yjmD0FxNxtEUi7rIt",
+          "name": "M_Concrete-Rectangular Beam:400 x 800mm:127651",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:400 x 800mm:127651"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Eq",
+          "name": "M_Concrete-Rectangular Beam:600 x 900:124784",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:600 x 900:124784"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Em",
+          "name": "M_Concrete-Rectangular Beam:600 x 900:124788",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:600 x 900:124788"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Eo",
+          "name": "M_Concrete-Rectangular Beam:600 x 900:124790",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:600 x 900:124790"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Ey",
+          "name": "M_Concrete-Rectangular Beam:600 x 900:124792",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:600 x 900:124792"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3E_",
+          "name": "M_Concrete-Rectangular Beam:600 x 900:124794",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:600 x 900:124794"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Eu",
+          "name": "M_Concrete-Rectangular Beam:600 x 900:124796",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:600 x 900:124796"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Ew",
+          "name": "M_Concrete-Rectangular Beam:600 x 900:124798",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:600 x 900:124798"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3D4",
+          "name": "M_Concrete-Rectangular Beam:600 x 900:124800",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:600 x 900:124800"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3D6",
+          "name": "M_Concrete-Rectangular Beam:600 x 900:124802",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:600 x 900:124802"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3D0",
+          "name": "M_Concrete-Rectangular Beam:600 x 900:124804",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:600 x 900:124804"
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3D2",
+          "name": "M_Concrete-Rectangular Beam:600 x 900:124806",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/M_Concrete-Rectangular Beam:600 x 900:124806"
+        },
+        {
+          "ifc_guid": "17qC4eX$v65AOIXuxtQbmF",
+          "name": "UB-Universal Beams:UB254x102x28:128135",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB254x102x28:128135"
+        },
+        {
+          "ifc_guid": "17qC4eX$v65AOIXuxtQbm1",
+          "name": "UB-Universal Beams:UB254x102x28:128137",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB254x102x28:128137"
+        },
+        {
+          "ifc_guid": "17qC4eX$v65AOIXuxtQbm3",
+          "name": "UB-Universal Beams:UB254x102x28:128139",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB254x102x28:128139"
+        },
+        {
+          "ifc_guid": "17qC4eX$v65AOIXuxtQbm5",
+          "name": "UB-Universal Beams:UB254x102x28:128141",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB254x102x28:128141"
+        },
+        {
+          "ifc_guid": "17qC4eX$v65AOIXuxtQbm7",
+          "name": "UB-Universal Beams:UB254x102x28:128143",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB254x102x28:128143"
+        },
+        {
+          "ifc_guid": "17qC4eX$v65AOIXuxtQbmP",
+          "name": "UB-Universal Beams:UB254x102x28:128145",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB254x102x28:128145"
+        },
+        {
+          "ifc_guid": "09KD49MHTAmgrPjP7hgCV4",
+          "name": "UB-Universal Beams:UB254x102x28:187046",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB254x102x28:187046"
+        },
+        {
+          "ifc_guid": "09KD49MHTAmgrPjP7hgCPZ",
+          "name": "UB-Universal Beams:UB254x102x28:187137",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB254x102x28:187137"
+        },
+        {
+          "ifc_guid": "2KAei9id52lOmXjM$MzgLf",
+          "name": "UB-Universal Beams:UB305x165x40:125944",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB305x165x40:125944"
+        },
+        {
+          "ifc_guid": "2KAei9id52lOmXjM$MzgAN",
+          "name": "UB-Universal Beams:UB305x165x40:125958",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB305x165x40:125958"
+        },
+        {
+          "ifc_guid": "2KAei9id52lOmXjM$MzgA5",
+          "name": "UB-Universal Beams:UB305x165x40:125972",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB305x165x40:125972"
+        },
+        {
+          "ifc_guid": "2KAei9id52lOmXjM$MzgAY",
+          "name": "UB-Universal Beams:UB305x165x40:126003",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB305x165x40:126003"
+        },
+        {
+          "ifc_guid": "03xCtbdOn27BjzGcbkcHa5",
+          "name": "UB-Universal Beams:UB305x165x40:127308",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB305x165x40:127308"
+        },
+        {
+          "ifc_guid": "17qC4eX$v65AOIXuxtQbmR",
+          "name": "UB-Universal Beams:UB305x165x40:128147",
+          "ifc_type": "IfcBeam",
+          "glb_node": "IfcBeam/UB-Universal Beams:UB305x165x40:128147"
+        }
+      ]
+    },
+    {
+      "zone_id": 2,
+      "zone_name": "Zone 2 - Substructure Pier B",
+      "mapping_confidence": "inferred_with_storey_ambiguity",
+      "mapping_rule": {
+        "storey_name": "01 - Entry Level",
+        "storey_guid": "35r2O_4kTAf8AbYFs_VCl2",
+        "component_type": "IfcColumn",
+        "candidate_alternate_storey": {
+          "storey_name": "Sub Level",
+          "storey_guid": "0cyJyJpgz269aC2ZMeIyS8",
+          "elevation_mm": -2499.9999999999995,
+          "components_in_dataset": 0,
+          "note": "Storey 'Sub Level' exists in building metadata at elevation -2500mm, but contains 0 components in components.json. Lowest structural columns in the BIM dataset are hosted on '01 - Entry Level' (elevation 0.0mm)."
+        }
+      },
+      "rationale": "Backend Zone 2 floor is designated as 'Substructure'. The BIM model contains 'Sub Level' (-2500mm) with 0 extracted structural elements, and '01 - Entry Level' (0.0mm) containing all 77 lowest vertical load-bearing columns. The mapping rule therefore selects the 77 IfcColumn elements on '01 - Entry Level' as the active spatial group representing the substructure/ground support zone, while documenting 'Sub Level' as the nominal foundation datum.",
+      "ambiguity_note": "Storey ambiguity exists between nominal datum 'Sub Level' (-2500mm, 0 elements) and host storey '01 - Entry Level' (0.0mm, 77 columns). The mapping rule designates '01 - Entry Level' with 'IfcColumn' so that valid 3D geometry can be resolved and highlighted, while recording the structural datum distinction.",
+      "expected_component_count": 77,
+      "resolved_component_count": 77,
+      "unresolved_component_count": 0,
+      "components": [
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_BM",
+          "name": "M_Concrete-Round-Column:450mm:122477",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122477"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_BL",
+          "name": "M_Concrete-Round-Column:450mm:122478",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122478"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_BK",
+          "name": "M_Concrete-Round-Column:450mm:122479",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122479"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_BB",
+          "name": "M_Concrete-Round-Column:450mm:122480",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122480"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_BA",
+          "name": "M_Concrete-Round-Column:450mm:122481",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122481"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_B9",
+          "name": "M_Concrete-Round-Column:450mm:122482",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122482"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_B8",
+          "name": "M_Concrete-Round-Column:450mm:122483",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122483"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_BF",
+          "name": "M_Concrete-Round-Column:450mm:122484",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122484"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_BE",
+          "name": "M_Concrete-Round-Column:450mm:122485",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122485"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_BD",
+          "name": "M_Concrete-Round-Column:450mm:122486",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122486"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_BC",
+          "name": "M_Concrete-Round-Column:450mm:122487",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122487"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_B3",
+          "name": "M_Concrete-Round-Column:450mm:122488",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122488"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_B1",
+          "name": "M_Concrete-Round-Column:450mm:122490",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122490"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_B0",
+          "name": "M_Concrete-Round-Column:450mm:122491",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122491"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_B7",
+          "name": "M_Concrete-Round-Column:450mm:122492",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122492"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_B6",
+          "name": "M_Concrete-Round-Column:450mm:122493",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122493"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_B5",
+          "name": "M_Concrete-Round-Column:450mm:122494",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122494"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_B4",
+          "name": "M_Concrete-Round-Column:450mm:122495",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122495"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8x",
+          "name": "M_Concrete-Round-Column:450mm:122496",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122496"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8w",
+          "name": "M_Concrete-Round-Column:450mm:122497",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122497"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8v",
+          "name": "M_Concrete-Round-Column:450mm:122498",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122498"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8$",
+          "name": "M_Concrete-Round-Column:450mm:122500",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122500"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8_",
+          "name": "M_Concrete-Round-Column:450mm:122501",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122501"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8y",
+          "name": "M_Concrete-Round-Column:450mm:122503",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122503"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8p",
+          "name": "M_Concrete-Round-Column:450mm:122504",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122504"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8o",
+          "name": "M_Concrete-Round-Column:450mm:122505",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122505"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8n",
+          "name": "M_Concrete-Round-Column:450mm:122506",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122506"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8m",
+          "name": "M_Concrete-Round-Column:450mm:122507",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122507"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8t",
+          "name": "M_Concrete-Round-Column:450mm:122508",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122508"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8s",
+          "name": "M_Concrete-Round-Column:450mm:122509",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122509"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8r",
+          "name": "M_Concrete-Round-Column:450mm:122510",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122510"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8q",
+          "name": "M_Concrete-Round-Column:450mm:122511",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122511"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8h",
+          "name": "M_Concrete-Round-Column:450mm:122512",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122512"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8f",
+          "name": "M_Concrete-Round-Column:450mm:122514",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122514"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8l",
+          "name": "M_Concrete-Round-Column:450mm:122516",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122516"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8k",
+          "name": "M_Concrete-Round-Column:450mm:122517",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122517"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8Z",
+          "name": "M_Concrete-Round-Column:450mm:122520",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122520"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8Y",
+          "name": "M_Concrete-Round-Column:450mm:122521",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122521"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8d",
+          "name": "M_Concrete-Round-Column:450mm:122524",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122524"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8c",
+          "name": "M_Concrete-Round-Column:450mm:122525",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122525"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8R",
+          "name": "M_Concrete-Round-Column:450mm:122528",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122528"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8Q",
+          "name": "M_Concrete-Round-Column:450mm:122529",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122529"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8J",
+          "name": "M_Concrete-Round-Column:450mm:122536",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122536"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8I",
+          "name": "M_Concrete-Round-Column:450mm:122537",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122537"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8M",
+          "name": "M_Concrete-Round-Column:450mm:122541",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122541"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8L",
+          "name": "M_Concrete-Round-Column:450mm:122542",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122542"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8B",
+          "name": "M_Concrete-Round-Column:450mm:122544",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122544"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8A",
+          "name": "M_Concrete-Round-Column:450mm:122545",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122545"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_88",
+          "name": "M_Concrete-Round-Column:450mm:122547",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122547"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8F",
+          "name": "M_Concrete-Round-Column:450mm:122548",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122548"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_83",
+          "name": "M_Concrete-Round-Column:450mm:122552",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122552"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_82",
+          "name": "M_Concrete-Round-Column:450mm:122553",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122553"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_87",
+          "name": "M_Concrete-Round-Column:450mm:122556",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122556"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_84",
+          "name": "M_Concrete-Round-Column:450mm:122559",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122559"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_9v",
+          "name": "M_Concrete-Round-Column:450mm:122562",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122562"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_9_",
+          "name": "M_Concrete-Round-Column:450mm:122565",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122565"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_9z",
+          "name": "M_Concrete-Round-Column:450mm:122566",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122566"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_9y",
+          "name": "M_Concrete-Round-Column:450mm:122567",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122567"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_9p",
+          "name": "M_Concrete-Round-Column:450mm:122568",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122568"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_9o",
+          "name": "M_Concrete-Round-Column:450mm:122569",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122569"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_9n",
+          "name": "M_Concrete-Round-Column:450mm:122570",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122570"
+        },
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_9m",
+          "name": "M_Concrete-Round-Column:450mm:122571",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:122571"
+        },
+        {
+          "ifc_guid": "01U2Ox69TF78CjGAzXHDlb",
+          "name": "M_Concrete-Round-Column:450mm:147371",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:450mm:147371"
+        },
+        {
+          "ifc_guid": "2$M5myxLHBzRtkBVyhm0VH",
+          "name": "M_Concrete-Round-Column:750mm:153219",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:750mm:153219"
+        },
+        {
+          "ifc_guid": "2$M5myxLHBzRtkBVyhm0VZ",
+          "name": "M_Concrete-Round-Column:750mm:153265",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:750mm:153265"
+        },
+        {
+          "ifc_guid": "2$M5myxLHBzRtkBVyhm0Uu",
+          "name": "M_Concrete-Round-Column:750mm:153322",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:750mm:153322"
+        },
+        {
+          "ifc_guid": "2$M5myxLHBzRtkBVyhm0PB",
+          "name": "M_Concrete-Round-Column:750mm:153369",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:750mm:153369"
+        },
+        {
+          "ifc_guid": "2$M5myxLHBzRtkBVyhm0OS",
+          "name": "M_Concrete-Round-Column:750mm:153422",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:750mm:153422"
+        },
+        {
+          "ifc_guid": "2$M5myxLHBzRtkBVyhm0RH",
+          "name": "M_Concrete-Round-Column:750mm:153475",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:750mm:153475"
+        },
+        {
+          "ifc_guid": "2$M5myxLHBzRtkBVyhm0Rc",
+          "name": "M_Concrete-Round-Column:750mm:153524",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/M_Concrete-Round-Column:750mm:153524"
+        },
+        {
+          "ifc_guid": "2Ci2k7uxXCqAqqsxOmEVd5",
+          "name": "UC-Universal Columns-Column:UC356x368x129:122695",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/UC-Universal Columns-Column:UC356x368x129:122695"
+        },
+        {
+          "ifc_guid": "2Ci2k7uxXCqAqqsxOmEVak",
+          "name": "UC-Universal Columns-Column:UC356x368x129:122796",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/UC-Universal Columns-Column:UC356x368x129:122796"
+        },
+        {
+          "ifc_guid": "2Ci2k7uxXCqAqqsxOmEVbx",
+          "name": "UC-Universal Columns-Column:UC356x368x129:122873",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/UC-Universal Columns-Column:UC356x368x129:122873"
+        },
+        {
+          "ifc_guid": "2Ci2k7uxXCqAqqsxOmESOv",
+          "name": "UC-Universal Columns-Column:UC356x368x129:123067",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/UC-Universal Columns-Column:UC356x368x129:123067"
+        },
+        {
+          "ifc_guid": "2Ci2k7uxXCqAqqsxOmESO_",
+          "name": "UC-Universal Columns-Column:UC356x368x129:123068",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/UC-Universal Columns-Column:UC356x368x129:123068"
+        },
+        {
+          "ifc_guid": "2Ci2k7uxXCqAqqsxOmESO$",
+          "name": "UC-Universal Columns-Column:UC356x368x129:123069",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/UC-Universal Columns-Column:UC356x368x129:123069"
+        },
+        {
+          "ifc_guid": "2Ci2k7uxXCqAqqsxOmESOy",
+          "name": "UC-Universal Columns-Column:UC356x368x129:123070",
+          "ifc_type": "IfcColumn",
+          "glb_node": "IfcColumn/UC-Universal Columns-Column:UC356x368x129:123070"
+        }
+      ]
+    }
+  ]
+}
