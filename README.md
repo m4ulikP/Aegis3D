@@ -9,8 +9,7 @@
 - **Madhav Kumar**
 
 **MAITRON 2026** | **Software Track**  
-**Primary SDG**: SDG 11 — Sustainable Cities and Communities  
-**Secondary SDG**: SDG 9 — Industry, Innovation and Infrastructure
+**SDG**: SDG 11 — Sustainable Cities and Communities
 
 ---
 
