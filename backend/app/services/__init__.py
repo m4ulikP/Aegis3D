@@ -8,6 +8,7 @@ from app.services.event_service import (
     ZoneNotFoundError,
 )
 from app.services.health_service import HealthService
+from app.services.monitoring_service import MonitoringService
 from app.services.trend_service import TrendService
 
 __all__ = [
@@ -20,6 +21,5 @@ __all__ = [
     "CorrelationService",
     "TrendService",
     "HealthService",
+    "MonitoringService",
 ]
-
-

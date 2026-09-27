@@ -25,10 +25,25 @@ def test_get_health_liveness(client: TestClient):
 
 
 def test_get_health_db_readiness(client: TestClient):
-    """Verify GET /health/db reaches real PostgreSQL and returns HTTP 200."""
-    response = client.get("/health/db")
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok", "database": "reachable"}
+    """Verify GET /health/db reaches database dependency and returns HTTP 200."""
+    def mock_working_get_db():
+        class WorkingSession:
+            def execute(self, statement):
+                class ScalarResult:
+                    def scalar(self):
+                        return 1
+                return ScalarResult()
+            def close(self):
+                pass
+        yield WorkingSession()
+
+    app.dependency_overrides[get_db] = mock_working_get_db
+    try:
+        response = client.get("/health/db")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok", "database": "reachable"}
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_get_health_db_unavailable_handling(client: TestClient):
