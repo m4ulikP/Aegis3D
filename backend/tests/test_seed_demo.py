@@ -24,6 +24,7 @@ from app.models.event import Event
 from app.models.health import HealthSnapshot
 from app.models.monitoring_session import MonitoringSession
 from app.models.zone import Zone
+from app.services.health_service import HealthService
 from app.services.monitoring_service import MonitoringService
 
 
@@ -132,6 +133,25 @@ def test_seed_demo_data_reset_option(db_session: Session):
     assert db_session.query(MonitoringSession).count() == 1
     assert db_session.query(Event).count() == 10
     assert db_session.query(Alert).count() == 1
+
+
+def test_seed_demo_transaction_rollback_on_failure(db_session: Session, monkeypatch: pytest.MonkeyPatch):
+    """Verify that an exception mid-way through seeding triggers a rollback and leaves no orphaned entities."""
+    def _failing_evaluate(*args, **kwargs):
+        raise RuntimeError("Simulated failure during health evaluation")
+
+    monkeypatch.setattr(HealthService, "evaluate_zone_health", _failing_evaluate)
+
+    with pytest.raises(RuntimeError, match="Simulated failure during health evaluation"):
+        seed_demo_data(db_session, reset=False)
+
+    # Verify atomic rollback: zero entities remain in DB
+    assert db_session.query(Zone).count() == 0
+    assert db_session.query(MonitoringSession).count() == 0
+    assert db_session.query(Baseline).count() == 0
+    assert db_session.query(Event).count() == 0
+    assert db_session.query(HealthSnapshot).count() == 0
+    assert db_session.query(Alert).count() == 0
 
 
 def test_seeded_data_retrievable_via_rest_api(client: TestClient, db_session: Session):

@@ -1,7 +1,6 @@
 """CLI script to seed reproducible Aegis3D demo data for frontend integration."""
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -10,14 +9,14 @@ backend_dir = Path(__file__).resolve().parent.parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-# Default DATABASE_URL to local SQLite database if not explicitly set
-if "DATABASE_URL" not in os.environ:
-    sqlite_db_path = backend_dir / "aegis3d_dev.db"
-    os.environ["DATABASE_URL"] = f"sqlite:///{sqlite_db_path.as_posix()}"
+from sqlalchemy.exc import OperationalError
 
 from app.db.base import Base
+from app.db.config import get_settings
 from app.db.seed import seed_demo_data
 from app.db.session import SessionLocal, engine
+
+settings = get_settings()
 
 
 def main():
@@ -33,15 +32,26 @@ def main():
     print("=" * 65)
     print("        AEGIS3D REPRODUCIBLE DEMO DATASET SEEDER")
     print("=" * 65)
+    print(f"Target Database URL: {settings.sync_database_url.split('@')[-1] if '@' in settings.sync_database_url else settings.sync_database_url}")
 
-    # Ensure tables exist in target database
-    Base.metadata.create_all(bind=engine)
-
-    db = SessionLocal()
     try:
-        summary = seed_demo_data(db=db, reset=args.reset)
-    finally:
-        db.close()
+        # Ensure tables exist in target PostgreSQL database
+        Base.metadata.create_all(bind=engine)
+
+        db = SessionLocal()
+        try:
+            summary = seed_demo_data(db=db, reset=args.reset)
+        finally:
+            db.close()
+
+    except OperationalError as err:
+        print("\n[ERROR] Database connection failed!")
+        print(f"Details: {err.orig if hasattr(err, 'orig') else err}")
+        print("\nPlease verify that the target PostgreSQL server is running and accessible.")
+        print("If using non-default PostgreSQL credentials or a custom host, set DATABASE_URL:")
+        print("  $env:DATABASE_URL=\"postgresql+psycopg2://user:pass@host:5432/dbname\"")
+        print("  python scripts/seed_demo.py")
+        sys.exit(1)
 
     print(f"\nExecution Status:          {summary['status'].upper()}")
     print(f"Reset Performed:           {summary['reset_performed']}")
