@@ -16,9 +16,9 @@
 
 ## Overview
 
-**Aegis3D** is a software-centric structural health monitoring (SHM) and early-warning platform with an optional physical piezoelectric transducer (PZT) sensing input layer. The platform observes structural acoustic and mechanical wave activity in buildings and infrastructure to detect anomalous behavior, evaluate multi-event persistence, correlate multi-sensor arrival times, analyze directional trend trajectories, and compute an explainable prototype Structural Health Indicator (SHI).
+**Aegis3D** is a software-centric structural health monitoring (SHM) and early-warning platform with an optional physical piezoelectric transducer (PZT) sensing input layer. The platform observes structural acoustic and mechanical wave activity in buildings and infrastructure to detect anomalous behavior, evaluate multi-event persistence, correlate multi-sensor arrival times, analyze directional trend trajectories, compute an explainable prototype Structural Health Indicator (SHI), and expose real-time monitoring data via frontend-consumable REST APIs.
 
-While PZT sensors and ESP32 microcontrollers form the planned physical sensing layer, Aegis3D is strictly **Software-First**. All core intelligence—DC offset removal, Butterworth lowpass filtering, threshold-based event detection, FFT feature extraction, zone statistical baselines, z-score anomaly detection, temporal persistence evaluation, 2-PZT time-difference-of-arrival correlation, directional trend analysis, and SHI scoring—is executed by pure, hardware-agnostic Python software modules. The backend functions seamlessly whether fed by live ESP32 streams, imported historical sensor logs, or synthetic signal sources.
+While PZT sensors and ESP32 microcontrollers form the planned physical sensing layer, Aegis3D is strictly **Software-First**. All core intelligence—DC offset removal, Butterworth lowpass filtering, threshold-based event detection, FFT feature extraction, zone statistical baselines, z-score anomaly detection, temporal persistence evaluation, 2-PZT time-difference-of-arrival correlation, directional trend analysis, SHI scoring, and REST API routing—is executed by pure, hardware-agnostic Python software modules. The backend functions seamlessly whether fed by live ESP32 streams, imported historical sensor logs, or synthetic signal sources.
 
 > **Crucial Technical Disclaimer**: Aegis3D is a continuous monitoring and early-warning software platform. It does **NOT** use machine learning inference, predict structural collapse, guarantee disaster prevention, replace licensed structural engineers, or provide certified engineering safety assessments. Piezoelectric Transducers (PZTs) capture acoustic and mechanical stress waves within materials; they do not directly "see" cracks. Human engineering inspection remains mandatory for actual structural diagnosis.
 
@@ -28,21 +28,35 @@ While PZT sensors and ESP32 microcontrollers form the planned physical sensing l
 
 Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
 - **Input Mechanism**: Physical PZT sensors and ESP32 microcontrollers serve as data collection nodes feeding voltage samples into the backend API or MQTT broker.
-- **Hardware-Agnostic Intelligence**: All signal processing, feature extraction, statistical baseline comparison, correlation, trend, and health indicator modules are decoupled from specific microcontrollers, sensor hardware, or database ORMs.
+- **Hardware-Agnostic Intelligence**: All signal processing, feature extraction, statistical baseline comparison, correlation, trend, health indicator, and REST API modules are decoupled from specific microcontrollers, sensor hardware, or database ORMs.
 - **Data Source Versatility**: Aegis3D evaluates signal inputs identically regardless of whether they originate from physical sensors, imported datasets, or simulator engines.
 
 ---
 
 ## Key Design Principles
 
-1. **Software-Centric & Hardware-Agnostic**: Signal processing, baseline, anomaly, correlation, trend, and health evaluation logic remain pure Python modules.
+1. **Software-Centric & Hardware-Agnostic**: Signal processing, baseline, anomaly, correlation, trend, health evaluation, and REST API routing logic remain pure Python modules.
 2. **Zero Machine Learning**: Aegis3D deliberately uses deterministic signal processing, standard deviation metrics, standardized z-scores, rolling window metrics, and rule-based thresholds instead of black-box AI/ML models.
-3. **Explainable Evidence**: All anomaly flags, persistence evaluations, correlation groups, trends, and health scores produce itemized, human-readable evidence statements explaining why a result was produced.
+3. **Explainable Evidence**: All anomaly flags, persistence evaluations, correlation groups, trends, health scores, and API endpoints produce itemized, human-readable evidence statements explaining why a result was produced.
 4. **Relational Domain Integrity**: Standardized PostgreSQL database schema storing structural zones, monitoring sessions, events, baselines, health snapshots, and alerts with foreign key constraints.
 
 ---
 
 ## Current Implementation Status
+
+### Implemented vs Scaffolded Overview
+
+- **IMPLEMENTED**:
+  - **Backend Steps 1–11**: Complete intelligence engine, PostgreSQL persistence, signal processing, baselining, z-score anomaly detection, temporal persistence, 2-PZT cross-sensor correlation, trend analysis, deterministic SHI, and frontend-consumable REST APIs.
+  - **BIM & IFC Processing**: Offline IFC spatial extraction (`building_metadata.json`, `glb_mapping.json`) mapping 879 structural elements across 5 storeys to 3D GLB node names.
+  - **3D BIM Model Asset**: 3D GLB structural geometry model (`building_demo.glb`, 6.92 MB).
+  - **GIS City Map Interface**: 2.5D MapLibre GL city map component (`CityMap.tsx`) rendering Delhi building footprint polygons (`delhi_buildings.json`).
+- **SCAFFOLDED / NOT YET CONNECTED**:
+  - **Frontend REST Integration**: Frontend application shell is created in Next.js 14, but client-side API fetches to backend REST routes are not yet connected.
+  - **Browser 3D BIM Renderer**: Three.js / React Three Fiber renderer component (`frontend/components/building/`) is scaffolded (`.gitkeep`); `three` dependencies are not yet installed in `frontend/package.json`.
+  - **Real-Time Streaming**: WebSockets and Server-Sent Events (SSE) live data flows are not yet implemented.
+
+### Implementation Status Breakdown
 
 | Component | Status | Description / Location |
 | :--- | :--- | :--- |
@@ -59,15 +73,18 @@ Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
 | **Deterministic Trend Analysis** | **Implemented** | Directional trend evaluation (`STABLE`, `INCREASING`, `DECREASING`, `INSUFFICIENT_DATA`) comparing sub-periods (`backend/app/trend/`) |
 | **Structural Health Indicator (SHI)** | **Implemented** | Deterministic 0–100 prototype monitoring score, itemized deductions, and `HealthStatus` mapping (`backend/app/health/`) |
 | **HealthSnapshot Persistence** | **Implemented** | Database persistence of health score, status, trend, reason, and evidence dict (`backend/app/services/health_service.py`) |
-| **Automated Test Suite** | **Implemented** | **128 passed** pytest unit & integration tests (`backend/tests/`) |
-| **Next.js Dashboard Interface** | *Scaffolded* | Visual dashboard interface structure (`frontend/`) |
-| **ESP32 Firmware** | *Scaffolded* | PlatformIO structure for ADC sampling & MQTT (`firmware/esp32/`) |
-| **Hardware PCB & Schematics** | *Scaffolded* | Schematic & PCB layout documentation (`hardware/`) |
-| **Physical PZT Benchtop Setup** | *Planned* | Controlled physical benchtop validation with physical sensor hardware |
+| **Monitoring & Health REST APIs** | **Implemented** | Exposes 8 REST endpoints for Zone listing, Zone detail, Zone events, SHI health, trend, correlation, alerts, and dashboard summary (`backend/app/api/routes/`) |
+| **Automated Test Suite** | **Implemented** | **143 passed / 2 skipped** pytest unit & integration tests (`backend/tests/`) |
+| **BIM/IFC Metadata Pipeline** | **Implemented** | Offline IFC extraction of 879 structural elements and GLB node mapping (`data/processed/bim/`) |
+| **3D Building Model Asset** | **Implemented** | 3D GLB structural asset (`models/glb/building_demo.glb`) |
+| **GIS City Map Component** | **Implemented** | Next.js 14 MapLibre GL 2.5D city map consuming `delhi_buildings.json` (`frontend/components/dashboard/CityMap.tsx`) |
+| **Frontend REST Integration** | *Scaffolded* | Next.js dashboard routes created (`frontend/app/`), client fetch calls to backend REST endpoints pending |
+| **Browser 3D BIM Viewer** | *Scaffolded* | R3F 3D building viewer component folder (`frontend/components/building/.gitkeep`) |
+| **ESP32 Firmware & Hardware** | *Scaffolded* | PlatformIO structure & PCB schematics (`firmware/`, `hardware/`) |
 
 ---
 
-## Implemented Processing & Intelligence Pipeline
+## Implemented Processing & Data Flow Pipeline
 
 ```text
 [ Raw Signal / Ingestion Input ]
@@ -107,6 +124,12 @@ Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
                  │
                  ▼
 [ 12. HealthSnapshot Persistence ] ─► Database snapshot persistence for monitoring session & zone history
+                 │
+                 ▼
+[ 13. FastAPI REST API Layer ] ─────► 8 REST endpoints exposing zones, health, trend, correlation, alerts & summary
+                 │
+                 ▼
+[ 14. Frontend Dashboard ] ─────────► Next.js 14 MapLibre GIS map & future live monitoring dashboard UI
 ```
 
 ---
@@ -199,11 +222,28 @@ Aggregates anomaly, persistence, and correlation into standardized classificatio
   - `score < 45.0` $\implies$ `HealthStatus.HIGH_PRIORITY_INSPECTION`
 - *Note*: Score boundaries and penalty weights are prototype monitoring parameters, NOT certified structural safety thresholds.
 
+### 9. Step 11 — Monitoring & Health REST API Layer (`backend/app/api/routes/`)
+Step 11 exposes all existing backend intelligence through 8 clean, frontend-consumable REST endpoints:
+
+- **`GET /api/v1/zones`**: Returns all monitoring zones (`ZoneResponse`).
+- **`GET /api/v1/zones/{zone_id}`**: Returns zone detail metadata (`ZoneDetailResponse`), including total event count, active alert count, and latest health status. Returns `404` if zone does not exist.
+- **`GET /api/v1/zones/{zone_id}/events`**: Returns zone event observations (`List[EventResponse]`) with filtering (`limit`, `start_time`, `end_time`, `severity`, `status`). Returns `404` if zone does not exist.
+- **`GET /api/v1/zones/{zone_id}/health`**: Returns latest Structural Health Indicator score, status, trend, reason, timestamp, evidence payload, and embedded safety disclaimer (`ZoneHealthResponse`). Returns `404` if zone does not exist.
+- **`GET /api/v1/zones/{zone_id}/trend`**: Exposes Step 9 deterministic trend analysis (`ZoneTrendResponse`), returning overall trend direction (`STABLE`, `INCREASING`, `DECREASING`, `INSUFFICIENT_DATA`), rate delta, magnitude delta, and sub-period metrics. Returns `404` if zone does not exist.
+- **`GET /api/v1/zones/{zone_id}/correlation`**: Exposes Step 8 temporal persistence and 2-PZT cross-sensor correlation groups (`ZoneCorrelationResponse`), with relative arrival hints and explicit non-localization note. Returns `404` if zone does not exist.
+- **`GET /api/v1/alerts`**: Returns actionable system alerts (`List[AlertResponse]`) with optional filtering (`zone_id`, `status`, `severity`, `limit`).
+- **`GET /api/v1/health/summary`**: Provides high-level dashboard health summary (`HealthSummaryResponse`), aggregating total zones, status counts, active alerts, recent events, and latest timestamp.
+
+**Key Step 11 Architectural Properties**:
+- **Zero Business Logic Duplication**: Endpoints delegate to `MonitoringService`, which reuses `HealthService`, `TrendService`, `CorrelationService`, and `EventService`.
+- **Unmodified Intelligence Algorithms**: Step 6–10 algorithms, thresholds, SHI formulas, correlation tolerances, and trend rules were **not** modified.
+- **Zero Database Schema Changes**: No database schema modifications were required. Existing `Zone`, `Event`, `HealthSnapshot`, and `Alert` tables cleanly support all REST queries.
+
 ---
 
 ## Mandatory SHI Limitation Disclaimer
 
-Every `StructuralHealthResult` output embeds the following mandatory safety disclaimer:
+Every `StructuralHealthResult` and `ZoneHealthResponse` output embeds the following mandatory safety disclaimer:
 
 > **"SHI is a prototype evidence-based monitoring indicator derived from observed signal/event behavior. It is not a certified structural safety score and does not independently establish structural damage or failure."**
 
@@ -220,11 +260,11 @@ Aegis3D explicitly does **NOT**:
 ### Hardware Integration Status
 - **Planned Input Architecture**: 2 × PZT sensors $\rightarrow$ Analog Signal Conditioning $\rightarrow$ ESP32 ADC $\rightarrow$ Wi-Fi/MQTT $\rightarrow$ Aegis3D backend API.
 - **Current Status**: ESP32 PlatformIO firmware and PCB schematics are scaffolded in `firmware/` and `hardware/`. Physical PZT acquisition is not yet fully integrated into the backend pipeline.
-- **Backend Independence**: The signal processing, baseline, anomaly, correlation, trend, and SHI modules operate seamlessly on simulated, imported, or sampled signal data without physical hardware dependencies.
+- **Backend Independence**: The signal processing, baseline, anomaly, correlation, trend, SHI, and REST API modules operate seamlessly on simulated, imported, or sampled signal data without physical hardware dependencies.
 
 ### Frontend Dashboard Status
-- **Current Status**: Next.js dashboard framework is scaffolded in `frontend/`.
-- **Planned Dashboard Features**: Real-time event monitoring, zone health status overview, historical trend visualization, inspection logs, and 3D digital-twin BIM zone view.
+- **Current Status**: Next.js 14 dashboard application shell is implemented in `frontend/`, featuring a 2.5D MapLibre GL city map component (`CityMap.tsx`) rendering Delhi building footprint polygons (`delhi_buildings.json`).
+- **Next Phases**: Connecting client-side React components to Step 11 backend REST APIs, building the browser-side 3D BIM component viewer (`BuildingViewer.tsx`), and adding real-time event updates.
 
 ---
 
@@ -240,12 +280,13 @@ Aegis3D/
 │   ├── alembic.ini              # Alembic database migration config
 │   ├── app/
 │   │   ├── main.py              # FastAPI app initialization & router setup
-│   │   ├── api/routes/          # REST endpoints (/health, /api/v1/events)
+│   │   ├── api/                 # REST router registration
+│   │   │   └── routes/          # REST endpoints (health.py, events.py, zones.py, alerts.py, monitoring.py)
 │   │   ├── db/                  # Session provider, Base engine, Alembic migrations
 │   │   ├── models/              # Zone, MonitoringSession, Event, Baseline, HealthSnapshot, Alert
-│   │   ├── schemas/             # Pydantic request/response schemas
+│   │   ├── schemas/             # Pydantic request/response schemas (event.py, zone.py, alert.py, health.py)
 │   │   ├── repositories/        # EventRepository, BaselineRepository
-│   │   ├── services/            # EventService, BaselineService, AnomalyService, CorrelationService, TrendService, HealthService
+│   │   ├── services/            # EventService, BaselineService, AnomalyService, CorrelationService, TrendService, HealthService, MonitoringService
 │   │   ├── processing/          # Signal filtering, window detection & FFT feature extraction
 │   │   ├── baseline/            # Pure zone statistical baseline calculation engine
 │   │   ├── anomaly/             # Pure z-score anomaly detection engine
@@ -254,7 +295,7 @@ Aegis3D/
 │   │   └── health/              # Pure Structural Health Indicator (SHI) calculation engine
 │   ├── scripts/
 │   │   └── demo_signal_processing.py  # Executable signal processing visual demo
-│   └── tests/                   # Complete backend pytest test suite (128 passing tests)
+│   └── tests/                   # Complete backend pytest test suite (145 total tests: 143 passed, 2 skipped)
 │       ├── test_signal_processing.py
 │       ├── test_baseline.py
 │       ├── test_anomaly.py
@@ -263,13 +304,14 @@ Aegis3D/
 │       ├── test_shi.py
 │       ├── test_api_events.py
 │       ├── test_api_health.py
+│       ├── test_api_monitoring.py # 17 tests covering Step 11 REST endpoints
 │       ├── test_db_config.py
 │       └── test_models.py
 ├── firmware/esp32/              # ESP32 PlatformIO firmware scaffolding
-├── frontend/                    # Next.js frontend dashboard scaffolding
+├── frontend/                    # Next.js 14 frontend dashboard & MapLibre GL GIS city map
 ├── hardware/                    # PCB layout, BOM, schematics scaffolding
-├── docs/                        # Architecture diagrams and documentation
-└── data/                        # Signal data storage directories
+├── docs/                        # Architecture diagrams and BIM_ARCHITECTURE.md
+└── data/                        # Signal and BIM data storage directories
 ```
 
 ---
@@ -320,6 +362,9 @@ uvicorn app.main:app --reload
 Verify endpoints:
 - **API Liveness Check**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 - **Database Readiness Check**: [http://127.0.0.1:8000/health/db](http://127.0.0.1:8000/health/db)
+- **List Zones**: [http://127.0.0.1:8000/api/v1/zones](http://127.0.0.1:8000/api/v1/zones)
+- **Health Summary**: [http://127.0.0.1:8000/api/v1/health/summary](http://127.0.0.1:8000/api/v1/health/summary)
+- **List Alerts**: [http://127.0.0.1:8000/api/v1/alerts](http://127.0.0.1:8000/api/v1/alerts)
 
 ---
 
@@ -330,7 +375,8 @@ Verify endpoints:
 cd backend
 .\.venv\Scripts\python.exe -m pytest tests/
 ```
-*Expected Result*: **`128 passed in ~2.0s`** (100% pass rate across 10 test modules).
+*Expected Result*: **`143 passed, 2 skipped in ~10.0s`** (100% pass rate across 11 test modules).  
+*Note*: The 2 skipped tests are PostgreSQL-dependent connection tests (`test_live_postgresql_connectivity` and `test_live_postgresql_session_query`) that skip gracefully when the local PostgreSQL server is offline.
 
 ### 2. Run Signal Processing Visual Demonstration
 ```bash
@@ -359,7 +405,7 @@ As physical hardware coupling progresses, Aegis3D will evaluate:
 
 ## Software-First Milestone Roadmap
 
-### Steps 1–10 (**Completed**)
+### Steps 1–11 (**Completed**)
 - [x] **Step 1**: Core domain models & schema design
 - [x] **Step 2**: PostgreSQL database persistence & Alembic migrations
 - [x] **Step 3**: FastAPI REST foundation & health endpoints
@@ -370,12 +416,12 @@ As physical hardware coupling progresses, Aegis3D will evaluate:
 - [x] **Step 8**: Temporal persistence evaluation, 2-PZT cross-sensor correlation & evidence aggregation
 - [x] **Step 9**: Deterministic zone trend analysis engine (`STABLE`, `INCREASING`, `DECREASING`, `INSUFFICIENT_DATA`)
 - [x] **Step 10**: Deterministic Structural Health Indicator (SHI 0–100 score, itemized deductions, `HealthSnapshot`)
+- [x] **Step 11**: Monitoring & Structural Health REST API integration endpoints (zones, health, trend, correlation, alerts, summary)
 
 ### Future Milestones (**Next Phases**)
-- [ ] **Step 11**: Monitoring & Structural Health REST API integration endpoints
-- [ ] **Step 12**: Next.js real-time monitoring dashboard interface
-- [ ] **Step 13**: Interactive simulation & demo data streaming workflow
-- [ ] **Step 14**: 3D BIM structural digital twin visualization
+- [ ] **Step 12**: Next.js client-side REST API integration & live SHI health cards
+- [ ] **Step 13**: Three.js / React Three Fiber 3D BIM structural digital-twin component viewer
+- [ ] **Step 14**: Interactive simulation & demo data streaming workflow
 - [ ] **Step 15**: ESP32 PlatformIO firmware ADC sampling completion & benchtop testing
 - [ ] **Step 16**: MQTT live ingestion adapter integration
 - [ ] **Step 17**: Multi-level alert creation & escalation workflow
