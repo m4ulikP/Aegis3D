@@ -1,9 +1,12 @@
 from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
-from app.db import SessionLocal
+from app.db.base import Base
+from app.db.session import get_db
 from app.main import app
 from app.models.enums import EventSeverity, EventSourceType, EventStatus, SessionMode, SessionStatus
 from app.models.event import Event
@@ -11,41 +14,57 @@ from app.models.monitoring_session import MonitoringSession
 from app.models.zone import Zone
 
 
-@pytest.fixture(name="client")
-def client_fixture():
-    with TestClient(app) as client:
-        yield client
-
-
-@pytest.fixture(name="seeded_context")
-def seeded_context_fixture():
-    """Fixture to seed a Zone and MonitoringSession in the database."""
-    session: Session = SessionLocal()
+@pytest.fixture(name="db_session")
+def db_session_fixture():
+    """In-memory SQLite database session fixture with StaticPool for thread safety."""
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = TestingSessionLocal()
     try:
-        zone = Zone(name="Test Zone Alpha", floor="Floor 1", description="Main test area")
-        msession = MonitoringSession(
-            name="Session 2026-01",
-            mode=SessionMode.LIVE,
-            status=SessionStatus.RUNNING,
-            started_at=datetime.now(timezone.utc),
-        )
-        session.add_all([zone, msession])
-        session.commit()
-        session.refresh(zone)
-        session.refresh(msession)
-
-        yield {"zone_id": zone.id, "session_id": msession.id}
-
-        # Cleanup created test entities
-        session.query(Event).filter(Event.zone_id == zone.id).delete()
-        session.delete(zone)
-        session.delete(msession)
-        session.commit()
+        yield session
     finally:
         session.close()
 
 
-def test_post_valid_event(client: TestClient, seeded_context: dict):
+@pytest.fixture(name="client")
+def client_fixture(db_session: Session):
+    """FastAPI TestClient fixture with overridden get_db dependency."""
+    def _get_db_override():
+        try:
+            yield db_session
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = _get_db_override
+    with TestClient(app) as client:
+        yield client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(name="seeded_context")
+def seeded_context_fixture(db_session: Session):
+    """Fixture to seed a Zone and MonitoringSession in the database."""
+    zone = Zone(name="Test Zone Alpha", floor="Floor 1", description="Main test area")
+    msession = MonitoringSession(
+        name="Session 2026-01",
+        mode=SessionMode.LIVE,
+        status=SessionStatus.RUNNING,
+        started_at=datetime.now(timezone.utc),
+    )
+    db_session.add_all([zone, msession])
+    db_session.commit()
+    db_session.refresh(zone)
+    db_session.refresh(msession)
+
+    return {"zone_id": zone.id, "session_id": msession.id}
+
+
+def test_post_valid_event(client: TestClient, seeded_context: dict, db_session: Session):
     """Test POST /api/v1/events with valid data persists to database and returns HTTP 201."""
     event_payload = {
         "session_id": seeded_context["session_id"],
@@ -74,16 +93,12 @@ def test_post_valid_event(client: TestClient, seeded_context: dict):
     assert data["source_id"] == "PZT-01"
     assert data["metadata"] == {"sensor_gain": 20, "location_offset": "center"}
 
-    # Verify event actually exists in PostgreSQL DB
-    db: Session = SessionLocal()
-    try:
-        db_event = db.query(Event).filter(Event.id == data["id"]).first()
-        assert db_event is not None
-        assert db_event.source_id == "PZT-01"
-        assert db_event.magnitude == 5.5
-        assert db_event.metadata_json == {"sensor_gain": 20, "location_offset": "center"}
-    finally:
-        db.close()
+    # Verify event actually exists in database
+    db_event = db_session.query(Event).filter(Event.id == data["id"]).first()
+    assert db_event is not None
+    assert db_event.source_id == "PZT-01"
+    assert db_event.magnitude == 5.5
+    assert db_event.metadata_json == {"sensor_gain": 20, "location_offset": "center"}
 
 
 def test_post_invalid_event_negative_values(client: TestClient, seeded_context: dict):
