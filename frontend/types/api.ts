@@ -87,3 +87,48 @@ export interface ZoneCorrelationResponse {
     total_events_count: number;
     correlated_groups: any[];
 }
+
+export interface TelemetryLatestResponse {
+    status: string;
+    telemetry_accepted: boolean;
+    sensor_id: string;
+    zone_id: number;
+    zone_name: string;
+    timestamp: string;
+    samples_count: number;
+    sample_rate_hz: number;
+    sequence?: number | null;
+    events_detected: number;
+    events: Array<{
+        event_id: number;
+        magnitude: number;
+        energy: number;
+        duration_ms: number;
+        frequency_hz?: number | null;
+        severity: EventSeverity;
+        is_anomalous: boolean;
+        magnitude_z_score?: number | null;
+        energy_z_score?: number | null;
+        anomaly_reasons?: string[];
+    }>;
+    extracted_features?: {
+        peak_amplitude: number;
+        rms_amplitude: number;
+        energy: number;
+        duration_ms: number;
+        frequency_hz?: number | null;
+        sample_count: number;
+    } | null;
+    temporal_persistence_confirmed?: boolean | null;
+    cross_sensor_correlation_confirmed?: boolean | null;
+    health_score?: number | null;
+    health_status?: HealthStatus | null;
+    health_trend?: string | null;
+    alert_generated: boolean;
+    alert_id?: number | null;
+    alert_severity?: AlertSeverity | null;
+    alert_title?: string | null;
+    detection_threshold?: number | null;
+    message: string;
+}
+

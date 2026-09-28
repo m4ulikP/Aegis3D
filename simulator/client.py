@@ -186,3 +186,79 @@ class TelemetryClient:
                 status_code=0,
                 error_message=err_msg,
             )
+
+
+def main() -> None:
+    """Phase 1 Single Request Execution Slice."""
+    import os
+    import sys
+
+    # Discover paths
+    _dir = os.path.dirname(os.path.abspath(__file__))
+    _parent = os.path.dirname(_dir)
+    if _dir not in sys.path:
+        sys.path.insert(0, _dir)
+    if _parent not in sys.path:
+        sys.path.insert(0, _parent)
+
+    try:
+        from simulator.config import SimulatorConfig
+        from simulator.sensors.virtual_pzt import VirtualPZTSensor
+    except ImportError:
+        from config import SimulatorConfig
+        from sensors.virtual_pzt import VirtualPZTSensor
+
+    print("=" * 60)
+    print("Aegis3D Virtual PZT Sensor Simulator — Phase 1 Vertical Slice")
+    print("=" * 60)
+
+    # 1. Load backend URL from environment
+    config = SimulatorConfig.from_env()
+    client = TelemetryClient(
+        backend_url=config.backend_url,
+        endpoint=config.telemetry_endpoint,
+        timeout_seconds=config.timeout_seconds,
+    )
+
+    # 2. Construct valid TelemetryIngestRequest & 3. Generate healthy waveform
+    sensor = VirtualPZTSensor(sensor_id="PZT-Z1-01")
+    payload = sensor.generate_payload(mode="healthy", sample_count=1000, seed=42)
+
+    print(f"\n[REQUEST SETUP]")
+    print(f"  Target URL    : {client.full_url}")
+    print(f"  Sensor ID     : {payload['sensor_id']}")
+    print(f"  Zone Name     : {payload['zone_name']}")
+    print(f"  Timestamp     : {payload['timestamp']}")
+    print(f"  Sample Rate   : {payload['sample_rate_hz']} Hz")
+    print(f"  Sample Count  : {len(payload['samples'])}")
+    print(f"  Signal Peak   : {max(abs(x) for x in payload['samples']):.4f}")
+
+    # 4. POST to /api/v1/telemetry
+    print(f"\n[DISPATCHING TELEMETRY POST]")
+    result = client.send_telemetry(payload)
+
+    # 5. Print HTTP status
+    print(f"  HTTP Status   : {result.status_code}")
+
+    # 6. Print actual backend response in readable form
+    if result.success and result.data:
+        print("\n[BACKEND RESPONSE SUCCESS]")
+        print(json.dumps(result.data, indent=2))
+        print(f"\n  Pipeline Status : {result.backend_status}")
+        print(f"  Events Detected : {result.events_detected}")
+        print(f"  Health Score    : {result.health_score}")
+        print(f"  Message         : {result.message}")
+    elif result.success:
+        print("\n[BACKEND RESPONSE SUCCESS (RAW)]")
+        print(result.raw_body)
+    else:
+        # 7. Handle connection / HTTP errors cleanly
+        print(f"\n[COMMUNICATION FAILED]")
+        print(f"  Error Message   : {result.error_message}")
+        if result.raw_body:
+            print(f"  Raw Body        : {result.raw_body}")
+
+
+if __name__ == "__main__":
+    main()
+
