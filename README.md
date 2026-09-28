@@ -77,9 +77,10 @@ Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
 | **Automated Test Suite** | **Implemented** | **164 passed / 1 warning** pytest unit & integration tests (`backend/tests/`) |
 | **BIM/IFC Metadata Pipeline** | **Implemented** | Offline IFC extraction of structural elements, GLB node mapping, and canonical `zone_bim_mapping.json` (`data/processed/bim/`) |
 | **3D Building Model Asset** | **Implemented** | 3D GLB structural asset (`models/glb/building_demo.glb`) |
-| **Browser 3D BIM Viewer** | **Implemented** | Three.js / React Three Fiber building viewer integrated with zone health & BIM highlighting (`frontend/components/building/BuildingViewer.tsx`) |
+| **Browser 3D BIM Viewer** | **Implemented** | Three.js / React Three Fiber building viewer integrated with zone health & BIM highlighting (`frontend/components/building/DigitalTwinViewer.tsx`) |
+| **Processing Pipeline Strip** | **Implemented** | 7-stage deterministic signal processing evidence visualization component with 3-column CSS Grid layout (`frontend/components/dashboard/ProcessingPipelineStrip.tsx`) |
 | **GIS City Map Component** | **Implemented** | Next.js 14 MapLibre GL 2.5D city map consuming `delhi_buildings.json` (`frontend/components/dashboard/CityMap.tsx`) |
-| **Virtual Sensor Simulator** | *Upcoming* | Prototype telemetry stream generator for virtual sensor simulation |
+| **Virtual Sensor Simulator** | **Implemented** | Multi-sensor synthetic waveform generator emitting telemetry streams to `POST /api/v1/telemetry` (`simulator/`) |
 | **ESP32 Firmware & Hardware** | *Scaffolded* | PlatformIO structure & PCB schematics (`firmware/`, `hardware/`) |
 
 ---
@@ -349,9 +350,15 @@ Aegis3D explicitly does **NOT**:
 - **Current Status**: ESP32 PlatformIO firmware and PCB schematics are scaffolded in `firmware/` and `hardware/`. Physical PZT acquisition is not yet fully integrated into the backend pipeline.
 - **Backend Independence**: The signal processing, baseline, anomaly, correlation, trend, SHI, and REST API modules operate seamlessly on simulated, imported, or sampled signal data without physical hardware dependencies.
 
-### Frontend Dashboard Status
-- **Current Status**: Next.js 14 dashboard application shell is implemented in `frontend/`, featuring a 2.5D MapLibre GL city map component (`CityMap.tsx`) rendering Delhi building footprint polygons (`delhi_buildings.json`).
-- **Next Phases**: Connecting client-side React components to Step 11 backend REST APIs, building the browser-side 3D BIM component viewer (`BuildingViewer.tsx`), and adding real-time event updates.
+### Frontend Dashboard & Digital Twin HUD Status
+- **Current Status**: Next.js 14 dashboard application shell implemented in `frontend/`, featuring a 2.5D MapLibre GL city map component (`CityMap.tsx`) rendering Delhi building footprint polygons (`delhi_buildings.json`) alongside an interactive 3D BIM Digital Twin modal (`DigitalTwinViewer.tsx`) and telemetry HUD components (`TelemetryHUD.tsx`, `ProcessingPipelineStrip.tsx`).
+- **Processing Pipeline Strip Layout Architecture (`ProcessingPipelineStrip.tsx`)**:
+  - **Evidence Visualization Role**: Displays the 7-stage backend signal processing verification pipeline (`01 INGESTION`, `02 CONDITIONING`, `03 EVENT DETECT`, `04 ANOMALY EVAL`, `05 CORRELATION`, `06 HEALTH (SHI)`, `07 SYSTEM ALERT`). *Architectural note*: The UI component acts strictly as a visual presentation layer rendering real backend processing telemetry (`TelemetryLatestResponse`); signal filtering, feature extraction, z-score anomaly scoring, and SHI formulas are executed entirely by the backend engine.
+  - **Deterministic 3-Column CSS Grid**: Each pipeline stage row enforces a 3-column layout (`gridTemplateColumns: "auto minmax(0, 1fr) auto"`):
+    1. **Left (Stage Identifier & Label)**: Stage index and stage name (`flexShrink: 0`, `whiteSpace: "nowrap"`).
+    2. **Middle (Flexible Evidence Description)**: Flexible evidence text container (`minmax(0, 1fr)`, `minWidth: 0`, `overflow: "hidden"`, `textOverflow: "ellipsis"`, `whiteSpace: "nowrap"`). Includes `title={stage.evidence}` tooltips for full evidence text preview on hover.
+    3. **Right (Status / Value Badge)**: Fixed/min-content status badge (`flexShrink: 0`, `whiteSpace: "nowrap"`).
+  - **Layout Constraints**: Long evidence strings truncate gracefully via CSS ellipsis without colliding with right-side status badges, preventing badge clipping, horizontal scrollbars, nested viewport scrollbars, or page-level scrollbars across screen resolutions (1920×1080, 1440×900, and modal viewports).
 
 ---
 
