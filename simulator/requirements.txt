@@ -1,0 +1,4 @@
+# Aegis3D Virtual Sensor Simulator
+# Lightweight standalone requirements for representative telemetry generation and transmission
+numpy>=1.24.0
+pytest>=8.0.0
