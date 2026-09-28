@@ -68,12 +68,49 @@ interface DigitalTwinViewerProps {
 }
 
 /* =========================================================
+   ZONE IDENTITY RESOLUTION HELPER
+========================================================= */
+
+export function resolveBackendZone(
+    mappingZone: ZoneBimMappingEntry,
+    backendZones: ZoneResponse[]
+): ZoneResponse | undefined {
+    if (!backendZones || backendZones.length === 0) return undefined;
+
+    // 1. Exact name match
+    const exactMatch = backendZones.find(
+        (bz) => bz.name === mappingZone.zone_name
+    );
+    if (exactMatch) return exactMatch;
+
+    // 2. Case-insensitive / trimmed name match
+    const normalizedMatch = backendZones.find(
+        (bz) => bz.name.trim().toLowerCase() === mappingZone.zone_name.trim().toLowerCase()
+    );
+    if (normalizedMatch) return normalizedMatch;
+
+    // 3. Match by zone number if name starts with "Zone X"
+    const zoneNumMatch = mappingZone.zone_name.match(/Zone\s*(\d+)/i);
+    if (zoneNumMatch) {
+        const num = zoneNumMatch[1];
+        const numMatch = backendZones.find((bz) => {
+            const bzNum = bz.name.match(/Zone\s*(\d+)/i);
+            return bzNum && bzNum[1] === num;
+        });
+        if (numMatch) return numMatch;
+    }
+
+    return undefined;
+}
+
+/* =========================================================
    BUILDING MODEL WITH DYNAMIC MATERIAL HIGHLIGHTING
 ========================================================= */
 
 interface BuildingModelProps {
     mapping: ZoneBimMappingFile | null;
     activeZoneId: number | null;
+    zones: ZoneResponse[];
     zoneHealthMap: Record<number, ZoneHealthResponse>;
     alerts: AlertResponse[];
     onSelectZone?: (zoneId: number) => void;
@@ -82,6 +119,7 @@ interface BuildingModelProps {
 function BuildingModel({
     mapping,
     activeZoneId,
+    zones,
     zoneHealthMap,
     alerts,
 }: BuildingModelProps) {
@@ -200,10 +238,13 @@ function BuildingModel({
                 const isSelected = activeZoneId === zone.zone_id;
                 const isViewingAll = activeZoneId === null;
 
-                const zoneAlerts = alerts.filter(
-                    (a) => a.zone_id === zone.zone_id && a.status === "ACTIVE"
-                );
-                const health = zoneHealthMap[zone.zone_id];
+                const backendZone = resolveBackendZone(zone, zones);
+                const backendZoneId = backendZone?.id;
+
+                const zoneAlerts = backendZoneId !== undefined
+                    ? alerts.filter((a) => a.zone_id === backendZoneId && a.status === "ACTIVE")
+                    : [];
+                const health = backendZoneId !== undefined ? zoneHealthMap[backendZoneId] : undefined;
 
                 const hasCriticalAlert = zoneAlerts.some(
                     (a) => a.severity === "CRITICAL" || a.severity === "HIGH"
@@ -246,7 +287,7 @@ function BuildingModel({
             });
             createdMaterials.forEach((mat) => mat.dispose());
         };
-    }, [mapping, zoneMeshesMap, activeZoneId, zoneHealthMap, alerts, originalMaterials]);
+    }, [mapping, zoneMeshesMap, activeZoneId, zones, zoneHealthMap, alerts, originalMaterials]);
 
     return <primitive object={model} />;
 }
@@ -502,15 +543,20 @@ export default function DigitalTwinViewer({
                 {/* Zone Cards */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {mapping?.zones.map((zone) => {
-                        const health = zoneHealthMap[zone.zone_id];
-                        const zoneAlerts = alerts.filter(
-                            (a) => a.zone_id === zone.zone_id && a.status === "ACTIVE"
-                        );
+                        const backendZone = resolveBackendZone(zone, zones);
+                        const backendZoneId = backendZone?.id;
+                        const health = backendZoneId !== undefined ? zoneHealthMap[backendZoneId] : undefined;
+                        const zoneAlerts = backendZoneId !== undefined
+                            ? alerts.filter((a) => a.zone_id === backendZoneId && a.status === "ACTIVE")
+                            : [];
                         const isSelected = activeZoneId === zone.zone_id;
                         const isCritical =
                             zoneAlerts.some((a) => a.severity === "CRITICAL" || a.severity === "HIGH") ||
                             health?.status === "HIGH_PRIORITY_INSPECTION" ||
                             health?.status === "INSPECTION_ADVISED";
+                        const isWarning =
+                            zoneAlerts.some((a) => a.severity === "MEDIUM" || a.severity === "LOW") ||
+                            health?.status === "MONITOR";
 
                         return (
                             <div
@@ -541,11 +587,13 @@ export default function DigitalTwinViewer({
                                             fontWeight: 700,
                                             padding: "2px 6px",
                                             borderRadius: 4,
-                                            background: isCritical ? "#dc2626" : "#059669",
+                                            background: isCritical ? "#dc2626" : isWarning ? "#d97706" : "#059669",
                                             color: "#ffffff",
                                         }}
                                     >
-                                        {health?.status ?? (isCritical ? "ALERT ACTIVE" : "NORMAL")}
+                                        {isCritical && zoneAlerts.length > 0 && (!health || health.status === "NORMAL")
+                                            ? "ALERT ACTIVE"
+                                            : (health?.status ?? (isCritical ? "ALERT ACTIVE" : "NORMAL"))}
                                     </span>
                                 </div>
 
@@ -557,8 +605,8 @@ export default function DigitalTwinViewer({
                                 {health?.score !== undefined && (
                                     <div style={{ fontSize: 11, color: "#cbd5e1", marginBottom: 6, display: "flex", justifyContent: "space-between" }}>
                                         <span>Structural Health Indicator (SHI):</span>
-                                        <span style={{ fontWeight: 700, color: isCritical ? "#f87171" : "#34d399" }}>
-                                            {(health.score * 100).toFixed(1)}%
+                                        <span style={{ fontWeight: 700, color: isCritical ? "#f87171" : isWarning ? "#fbbf24" : "#34d399" }}>
+                                            {health.score.toFixed(1)} / 100
                                         </span>
                                     </div>
                                 )}
@@ -636,6 +684,7 @@ export default function DigitalTwinViewer({
                 <BuildingModel
                     mapping={mapping}
                     activeZoneId={activeZoneId}
+                    zones={zones}
                     zoneHealthMap={zoneHealthMap}
                     alerts={alerts}
                     onSelectZone={(id) => setActiveZoneId(id)}

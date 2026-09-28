@@ -9,6 +9,10 @@ from app.services.event_service import (
 )
 from app.services.health_service import HealthService
 from app.services.monitoring_service import MonitoringService
+from app.services.telemetry_service import (
+    InconsistentSensorZoneError,
+    TelemetryService,
+)
 from app.services.trend_service import TrendService
 
 __all__ = [
@@ -22,4 +26,7 @@ __all__ = [
     "TrendService",
     "HealthService",
     "MonitoringService",
+    "TelemetryService",
+    "InconsistentSensorZoneError",
 ]
+
