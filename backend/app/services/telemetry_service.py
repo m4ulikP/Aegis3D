@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 import re
-from typing import List, Optional
+from typing import Dict, List, Optional
 import numpy as np
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -24,22 +24,115 @@ from app.models.health import HealthSnapshot
 from app.models.monitoring_session import MonitoringSession
 from app.models.zone import Zone
 from app.processing import (
+    DetectedWindow,
     ProcessedEvent,
     SampledSignal,
+    detect_events,
+    extract_features,
+    moving_average_filter,
     process_signal_pipeline,
+    remove_dc_offset,
 )
 from app.repositories.baseline_repository import BaselineRepository
 from app.repositories.event_repository import EventRepository
+from app.schemas.processing_trace import (
+    AlertTrace,
+    AnomalyEvaluationTrace,
+    BaselineTrace,
+    ConditioningTrace,
+    CorrelationTrace,
+    DetectedWindowTrace,
+    EventDetectionTrace,
+    FeatureExtractionTrace,
+    HealthTrace,
+    PersistenceTrace,
+    ProcessingTraceResponse,
+    RawTelemetryTrace,
+    TraceMetadata,
+    TrendTrace,
+)
 from app.schemas.telemetry import (
     ExtractedFeaturesSchema,
     TelemetryEventResult,
     TelemetryIngestRequest,
     TelemetryIngestResponse,
+    TelemetryLatestResponse,
 )
 from app.services.anomaly_service import AnomalyService
 from app.services.correlation_service import CorrelationService
 from app.services.health_service import HealthService
 from app.services.trend_service import TrendService
+
+
+# Thread-safe in-memory cache of latest ingested telemetry snapshots keyed by stable sensor_id
+_latest_telemetry_by_sensor: Dict[str, TelemetryLatestResponse] = {}
+_most_recent_sensor_id: Optional[str] = None
+
+# Thread-safe in-memory cache of processing traces keyed by trace_id, event_id, sensor_id, and 'latest'
+_processing_traces: Dict[str, ProcessingTraceResponse] = {}
+_most_recent_trace_id: Optional[str] = None
+
+
+def _get_latest_snapshot(sensor_id: Optional[str] = None) -> Optional[TelemetryLatestResponse]:
+    """Retrieve the latest telemetry snapshot for a specific sensor or the most recently received sensor."""
+    if sensor_id is not None:
+        return _latest_telemetry_by_sensor.get(sensor_id.strip())
+    if _most_recent_sensor_id and _most_recent_sensor_id in _latest_telemetry_by_sensor:
+        return _latest_telemetry_by_sensor[_most_recent_sensor_id]
+    return None
+
+
+def _set_latest_snapshot(snapshot: TelemetryLatestResponse) -> None:
+    """Store latest telemetry snapshot keyed by stable sensor_id and mark as most recent."""
+    global _most_recent_sensor_id
+    if snapshot and snapshot.sensor_id:
+        sid = snapshot.sensor_id.strip()
+        _latest_telemetry_by_sensor[sid] = snapshot
+        _most_recent_sensor_id = sid
+
+
+def _get_cached_processing_trace(identifier: str) -> Optional[ProcessingTraceResponse]:
+    """Retrieve cached processing trace by identifier."""
+    key = identifier.strip()
+    if key in _processing_traces:
+        return _processing_traces[key]
+    if key == "latest" and _most_recent_trace_id and _most_recent_trace_id in _processing_traces:
+        return _processing_traces[_most_recent_trace_id]
+    return None
+
+
+def _set_processing_trace(trace: ProcessingTraceResponse) -> None:
+    """Store processing trace in memory and update lookup keys."""
+    global _most_recent_trace_id
+    tid = trace.metadata.trace_id
+    _processing_traces[tid] = trace
+    _processing_traces[trace.metadata.sensor_id] = trace
+    _processing_traces["latest"] = trace
+    if trace.metadata.event_id is not None:
+        _processing_traces[str(trace.metadata.event_id)] = trace
+    _most_recent_trace_id = tid
+
+
+def _set_processing_trace_alias(key: str, trace: ProcessingTraceResponse) -> None:
+    """Map an additional key (e.g. secondary event_id) to a trace."""
+    _processing_traces[key.strip()] = trace
+
+
+def _clear_all_telemetry_caches() -> None:
+    """Clear all cached sensor snapshots and processing traces (for testing purposes)."""
+    global _most_recent_sensor_id, _most_recent_trace_id
+    _latest_telemetry_by_sensor.clear()
+    _most_recent_sensor_id = None
+    _processing_traces.clear()
+    _most_recent_trace_id = None
+
+
+def _create_bounded_display_samples(samples: List[float], max_points: int = 500) -> List[float]:
+    """Window or downsample raw discrete values to a bounded array for HUD visualization."""
+    if len(samples) <= max_points:
+        return [float(s) for s in samples]
+    step = len(samples) / float(max_points)
+    return [float(samples[int(i * step)]) for i in range(max_points)]
 
 
 class ZoneNotFoundError(Exception):
@@ -99,6 +192,21 @@ class TelemetryService:
             correlation_service=self.correlation_service,
             trend_service=self.trend_service,
         )
+
+    @classmethod
+    def get_latest_telemetry(cls, sensor_id: Optional[str] = None) -> Optional[TelemetryLatestResponse]:
+        """Retrieve the latest ingested telemetry record for a specific sensor or the most recently received sensor."""
+        return _get_latest_snapshot(sensor_id=sensor_id)
+
+    @classmethod
+    def clear_latest_telemetry(cls) -> None:
+        """Clear cached telemetry snapshots and traces (useful for testing)."""
+        _clear_all_telemetry_caches()
+
+    @classmethod
+    def clear_processing_traces(cls) -> None:
+        """Clear cached processing traces (useful for testing)."""
+        _clear_all_telemetry_caches()
 
     def resolve_zone(self, zone_name: str) -> Zone:
         """Resolve a Zone by exact name, normalized name, or zone prefix."""
@@ -181,7 +289,7 @@ class TelemetryService:
            - Evaluate temporal persistence and 2-PZT cross-sensor correlation.
            - Recalculate zone Structural Health Indicator (SHI).
            - Generate system Alert if structural degradation is detected.
-        6. Return comprehensive structured processing result.
+        6. Construct detailed processing trace and return structured processing result.
         """
         # 1. Resolve Zone & Sensor
         zone = self.resolve_zone(payload.zone_name)
@@ -191,12 +299,18 @@ class TelemetryService:
         session = self.resolve_session(payload.session_id)
 
         # 3. Construct SampledSignal
+        raw_samples_arr = np.asarray(payload.samples, dtype=np.float64)
         signal = SampledSignal(
-            samples=np.asarray(payload.samples, dtype=np.float64),
+            samples=raw_samples_arr,
             sample_rate_hz=float(payload.sample_rate_hz),
             timestamp=payload.timestamp,
             source_id=payload.sensor_id,
         )
+
+        sample_count = len(payload.samples)
+        raw_mean_dc = float(np.mean(raw_samples_arr)) if sample_count > 0 else 0.0
+        raw_peak = float(np.max(np.abs(raw_samples_arr))) if sample_count > 0 else 0.0
+        raw_rms = float(np.sqrt(np.mean(np.square(raw_samples_arr)))) if sample_count > 0 else 0.0
 
         # 4. Determine event detection threshold
         baseline = self.baseline_repository.get_latest_for_zone(zone.id)
@@ -208,21 +322,44 @@ class TelemetryService:
         else:
             threshold = 1.0
 
-        # 5. Execute Signal Processing Pipeline
-        processed_events: List[ProcessedEvent] = process_signal_pipeline(
-            signal=signal,
-            detection_threshold=threshold,
-            remove_dc=True,
-            filter_window_size=3 if len(signal.samples) >= 5 else None,
+        # 5. Execute Signal Processing Pipeline (Conditioning -> Event Detection -> Feature Extraction)
+        filter_win = 3 if sample_count >= 5 else None
+        proc_signal = remove_dc_offset(signal)
+        if filter_win is not None:
+            proc_signal = moving_average_filter(proc_signal, window_size=filter_win)
+
+        windows: List[DetectedWindow] = detect_events(
+            proc_signal,
+            threshold=threshold,
             min_duration_samples=1,
             merge_gap_samples=2,
         )
 
-        sample_count = len(payload.samples)
+        processed_events: List[ProcessedEvent] = []
+        for win in windows:
+            p_event = extract_features(proc_signal, win)
+            processed_events.append(p_event)
+
+        bounded_raw_samples = _create_bounded_display_samples(payload.samples)
+        bounded_cond_samples = _create_bounded_display_samples(proc_signal.samples.tolist())
+
+        # Build baseline trace representation
+        baseline_trace = BaselineTrace(
+            baseline_id=baseline.id if baseline else None,
+            zone_id=zone.id,
+            mean_magnitude=baseline.mean_magnitude if baseline else None,
+            std_magnitude=baseline.std_magnitude if baseline else None,
+            mean_energy=baseline.mean_energy if baseline else None,
+            std_energy=baseline.std_energy if baseline else None,
+            normal_event_rate=baseline.normal_event_rate if baseline else None,
+            valid_from=baseline.valid_from if baseline else None,
+            valid_until=baseline.valid_until if baseline else None,
+            baseline_available=baseline is not None,
+        )
 
         # Case A: No events detected (quiet / below-threshold signal)
         if len(processed_events) == 0:
-            return TelemetryIngestResponse(
+            res = TelemetryIngestResponse(
                 status="PROCESSED_NO_EVENT",
                 telemetry_accepted=True,
                 sensor_id=payload.sensor_id,
@@ -246,11 +383,98 @@ class TelemetryService:
                 alert_title=None,
                 message=f"Telemetry from '{payload.sensor_id}' processed. Signal activity remained below detection threshold ({threshold:.2f}).",
             )
+            _set_latest_snapshot(
+                TelemetryLatestResponse(
+                    **res.model_dump(),
+                    samples=bounded_raw_samples,
+                    detection_threshold=threshold,
+                )
+            )
+
+            # Record processing trace for quiet packet
+            trace_id = f"trace-{payload.sensor_id}-{payload.sequence if payload.sequence is not None else int(payload.timestamp.timestamp())}"
+            trace_resp = ProcessingTraceResponse(
+                metadata=TraceMetadata(
+                    trace_id=trace_id,
+                    event_id=None,
+                    sensor_id=payload.sensor_id,
+                    zone_id=zone.id,
+                    zone_name=zone.name,
+                    timestamp=payload.timestamp,
+                    sequence=payload.sequence,
+                    sample_rate_hz=payload.sample_rate_hz,
+                    samples_count=sample_count,
+                    session_id=session.id,
+                ),
+                ingestion=RawTelemetryTrace(
+                    sensor_id=payload.sensor_id,
+                    zone_name=zone.name,
+                    timestamp=payload.timestamp,
+                    sample_rate_hz=payload.sample_rate_hz,
+                    samples_count=sample_count,
+                    sequence=payload.sequence,
+                    samples_bounded=bounded_raw_samples,
+                    peak_amplitude=raw_peak,
+                    rms_amplitude=raw_rms,
+                    is_bounded=sample_count > 500,
+                ),
+                conditioning=ConditioningTrace(
+                    dc_removal_applied=True,
+                    dc_offset_removed=raw_mean_dc,
+                    filter_applied=filter_win is not None,
+                    filter_type="MOVING_AVERAGE" if filter_win is not None else None,
+                    filter_window_size=filter_win,
+                    conditioned_samples_bounded=bounded_cond_samples,
+                ),
+                event_detection=EventDetectionTrace(
+                    detection_threshold=threshold,
+                    events_detected_count=0,
+                    events_detected=False,
+                    min_duration_samples=1,
+                    merge_gap_samples=2,
+                    detected_windows=[],
+                ),
+                features=None,
+                baseline=baseline_trace,
+                anomaly=AnomalyEvaluationTrace(
+                    evaluated=False,
+                    is_anomalous=False,
+                    z_threshold=3.0,
+                    reasons=["Signal activity below detection threshold; anomaly evaluation not triggered."],
+                ),
+                persistence=PersistenceTrace(
+                    evaluated=False,
+                    is_persistent=False,
+                    reasons=["No structural events detected in current telemetry packet."],
+                ),
+                correlation=CorrelationTrace(
+                    evaluated=False,
+                    is_cross_sensor_correlated=False,
+                    reasons=["No structural events detected in current telemetry packet."],
+                ),
+                trend=TrendTrace(
+                    evaluated=False,
+                    overall_trend=None,
+                    reasons=["No structural events detected in current telemetry packet."],
+                ),
+                health=HealthTrace(
+                    evaluated=False,
+                    health_score=None,
+                    health_status=None,
+                    evidence_summary=["Signal activity within quiet baseline envelope."],
+                ),
+                alert=AlertTrace(
+                    alert_generated=False,
+                ),
+            )
+            _set_processing_trace(trace_resp)
+            return res
 
         # Case B: Events detected -> execute downstream pipeline
         event_results: List[TelemetryEventResult] = []
         first_features: Optional[ExtractedFeaturesSchema] = None
         has_any_anomaly = False
+        primary_anomaly_res = None
 
         for p_event in processed_events:
             # Set extracted features schema from first detected event window
@@ -314,6 +538,8 @@ class TelemetryService:
             if baseline:
                 try:
                     anom_res = self.anomaly_service.analyze_event_by_id(db_event.id)
+                    if primary_anomaly_res is None:
+                        primary_anomaly_res = anom_res
                     is_anom = anom_res.is_anomalous
                     z_mag_val = anom_res.magnitude_z_score
                     z_eng_val = anom_res.energy_z_score
@@ -407,7 +633,7 @@ class TelemetryService:
         if alert_generated:
             msg += f" Active alert #{alert_id} ({alert_sev.value}) generated."
 
-        return TelemetryIngestResponse(
+        res = TelemetryIngestResponse(
             status=status_str,
             telemetry_accepted=True,
             sensor_id=payload.sensor_id,
@@ -431,3 +657,373 @@ class TelemetryService:
             alert_title=alert_title,
             message=msg,
         )
+        _set_latest_snapshot(
+            TelemetryLatestResponse(
+                **res.model_dump(),
+                samples=bounded_raw_samples,
+                detection_threshold=threshold,
+            )
+        )
+
+        # Build comprehensive processing trace for detected event run
+        primary_res = event_results[0]
+        first_p_evt = processed_events[0]
+        primary_group = next((g for g in corr_groups if primary_res.event_id in g.event_ids), None)
+        if primary_group is None and corr_groups:
+            primary_group = corr_groups[0]
+
+        trace_id = f"trace-evt-{primary_res.event_id}"
+        trace_resp = ProcessingTraceResponse(
+            metadata=TraceMetadata(
+                trace_id=trace_id,
+                event_id=primary_res.event_id,
+                sensor_id=payload.sensor_id,
+                zone_id=zone.id,
+                zone_name=zone.name,
+                timestamp=payload.timestamp,
+                sequence=payload.sequence,
+                sample_rate_hz=payload.sample_rate_hz,
+                samples_count=sample_count,
+                session_id=session.id,
+            ),
+            ingestion=RawTelemetryTrace(
+                sensor_id=payload.sensor_id,
+                zone_name=zone.name,
+                timestamp=payload.timestamp,
+                sample_rate_hz=payload.sample_rate_hz,
+                samples_count=sample_count,
+                sequence=payload.sequence,
+                samples_bounded=bounded_raw_samples,
+                peak_amplitude=raw_peak,
+                rms_amplitude=raw_rms,
+                is_bounded=sample_count > 500,
+            ),
+            conditioning=ConditioningTrace(
+                dc_removal_applied=True,
+                dc_offset_removed=raw_mean_dc,
+                filter_applied=filter_win is not None,
+                filter_type="MOVING_AVERAGE" if filter_win is not None else None,
+                filter_window_size=filter_win,
+                conditioned_samples_bounded=bounded_cond_samples,
+            ),
+            event_detection=EventDetectionTrace(
+                detection_threshold=threshold,
+                events_detected_count=len(processed_events),
+                events_detected=True,
+                min_duration_samples=1,
+                merge_gap_samples=2,
+                detected_windows=[
+                    DetectedWindowTrace(
+                        start_index=w.start_index,
+                        end_index=w.end_index,
+                        start_time_ms=w.start_time_ms,
+                        end_time_ms=w.end_time_ms,
+                        duration_ms=w.duration_ms,
+                        peak_amplitude=w.peak_amplitude,
+                        rms_amplitude=w.rms_amplitude,
+                        sample_count=w.sample_count,
+                    )
+                    for w in windows
+                ],
+            ),
+            features=FeatureExtractionTrace(
+                event_id=primary_res.event_id,
+                peak_amplitude=first_p_evt.magnitude,
+                rms_amplitude=first_p_evt.rms_amplitude,
+                energy=first_p_evt.energy,
+                duration_ms=first_p_evt.duration_ms,
+                frequency_hz=first_p_evt.frequency_hz,
+                sample_count=first_p_evt.sample_count,
+                features_dict=first_p_evt.features,
+            ),
+            baseline=baseline_trace,
+            anomaly=AnomalyEvaluationTrace(
+                evaluated=baseline is not None,
+                is_anomalous=primary_res.is_anomalous,
+                magnitude_z_score=primary_res.magnitude_z_score,
+                energy_z_score=primary_res.energy_z_score,
+                magnitude_anomalous=(
+                    abs(primary_res.magnitude_z_score) >= 3.0
+                    if primary_res.magnitude_z_score is not None
+                    else False
+                ),
+                energy_anomalous=(
+                    abs(primary_res.energy_z_score) >= 3.0
+                    if primary_res.energy_z_score is not None
+                    else False
+                ),
+                z_threshold=3.0,
+                severity=primary_res.severity,
+                reasons=primary_res.anomaly_reasons,
+            ),
+            persistence=PersistenceTrace(
+                evaluated=True,
+                is_persistent=persistence_res.is_persistent,
+                total_events_in_window=persistence_res.total_events,
+                anomalous_events_in_window=persistence_res.anomalous_events,
+                anomaly_ratio=persistence_res.anomaly_ratio,
+                max_consecutive_anomalies=persistence_res.max_consecutive_anomalies,
+                window_duration_seconds=persistence_res.window_duration_seconds,
+                min_anomaly_count_required=persistence_res.min_anomaly_count_used,
+                min_anomaly_ratio_required=persistence_res.min_anomaly_ratio_used,
+                reasons=list(persistence_res.reasons),
+            ),
+            correlation=CorrelationTrace(
+                evaluated=True,
+                is_cross_sensor_correlated=is_cross_sensor,
+                correlated_group_id=primary_group.group_id if primary_group else None,
+                participating_sensors=list(primary_group.participating_sensors) if primary_group else [payload.sensor_id],
+                event_ids=[int(eid) for eid in primary_group.event_ids] if primary_group else [primary_res.event_id],
+                temporal_spread_ms=primary_group.temporal_spread_ms if primary_group else 0.0,
+                tolerance_seconds=0.025,
+                relative_source_hint=primary_group.relative_source_hint if primary_group else None,
+                reasons=[primary_group.relative_source_hint] if (primary_group and primary_group.relative_source_hint) else (
+                    ["Multi-sensor cross-sensor correlation confirmed"] if is_cross_sensor else ["Single sensor localized excitation"]
+                ),
+            ),
+            trend=TrendTrace(
+                evaluated=True,
+                overall_trend=health_res.trend,
+                reasons=[f"Health trend classification: {health_res.trend}"],
+            ),
+            health=HealthTrace(
+                evaluated=True,
+                health_score=health_res.score,
+                health_status=health_res.status,
+                trend=health_res.trend,
+                deductions=health_res.deductions.to_dict() if hasattr(health_res.deductions, "to_dict") else None,
+                reason=health_res.reason,
+                evidence_summary=list(health_res.evidence_summary),
+            ),
+            alert=AlertTrace(
+                alert_generated=alert_generated,
+                alert_id=alert_id,
+                alert_severity=alert_sev,
+                alert_status=AlertStatus.ACTIVE if alert_generated else None,
+                alert_title=alert_title,
+                alert_message=health_res.reason if alert_generated else None,
+                timestamp=ref_time if alert_generated else None,
+            ),
+        )
+        _set_processing_trace(trace_resp)
+        for evt in event_results:
+            _set_processing_trace_alias(str(evt.event_id), trace_resp)
+
+        return res
+
+    def get_processing_trace(self, identifier: str) -> Optional[ProcessingTraceResponse]:
+        """
+        Retrieve a detailed processing trace by identifier (trace_id, event_id, sensor_id, or 'latest').
+
+        If not cached in memory, reconstructs the trace from database records without rerunning signal processing.
+        """
+        key = identifier.strip()
+
+        # 1. In-memory cached trace lookup
+        cached = _get_cached_processing_trace(key)
+        if cached is not None:
+            return cached
+
+        # 2. Database event lookup by integer ID
+        db_event: Optional[Event] = None
+        if key.isdigit():
+            db_event = self.db.query(Event).filter(Event.id == int(key)).first()
+        elif key.lower() == "latest":
+            db_event = self.db.query(Event).order_by(Event.timestamp.desc(), Event.id.desc()).first()
+        else:
+            # Check by sensor_id
+            db_event = (
+                self.db.query(Event)
+                .filter(Event.source_id == key)
+                .order_by(Event.timestamp.desc(), Event.id.desc())
+                .first()
+            )
+
+        if not db_event:
+            return None
+
+        # Reconstruct trace from database records
+        zone = self.db.query(Zone).filter(Zone.id == db_event.zone_id).first()
+        if not zone:
+            return None
+
+        baseline = self.baseline_repository.get_latest_for_zone(db_event.zone_id)
+        meta = db_event.metadata_json or {}
+        sample_rate = float(meta.get("sample_rate_hz", 1000.0))
+        sequence = meta.get("sequence")
+        sample_count = int(meta.get("sample_count", 0))
+        det_threshold = float(meta.get("detection_threshold", 1.0))
+        rms_amp = float(meta.get("rms_amplitude", 0.0))
+
+        # Anomaly evaluation
+        is_anom = False
+        z_mag = None
+        z_eng = None
+        reasons: List[str] = []
+        if baseline:
+            try:
+                anom_res = self.anomaly_service.analyze_event_by_id(db_event.id)
+                is_anom = anom_res.is_anomalous
+                z_mag = anom_res.magnitude_z_score
+                z_eng = anom_res.energy_z_score
+                reasons = list(anom_res.reasons)
+            except Exception:
+                pass
+
+        # Persistence evaluation
+        persistence_res = self.correlation_service.evaluate_zone_persistence(
+            zone_id=db_event.zone_id,
+            reference_time=db_event.timestamp,
+            window_duration_seconds=300.0,
+        )
+
+        # Correlation evaluation
+        corr_groups = self.correlation_service.correlate_zone_events(
+            zone_id=db_event.zone_id,
+            valid_from=db_event.timestamp - timedelta(seconds=300),
+            valid_until=db_event.timestamp,
+        )
+        is_cross_sensor = any(g.is_cross_sensor for g in corr_groups)
+        target_group = next((g for g in corr_groups if db_event.id in g.event_ids), None)
+
+        # Health snapshot
+        snapshot = (
+            self.db.query(HealthSnapshot)
+            .filter(HealthSnapshot.zone_id == db_event.zone_id, HealthSnapshot.timestamp <= db_event.timestamp)
+            .order_by(HealthSnapshot.timestamp.desc(), HealthSnapshot.id.desc())
+            .first()
+        )
+
+        # Alert
+        alert = (
+            self.db.query(Alert)
+            .filter(Alert.zone_id == db_event.zone_id, Alert.timestamp == db_event.timestamp)
+            .order_by(Alert.id.desc())
+            .first()
+        )
+
+        trace_id = f"trace-evt-{db_event.id}"
+        return ProcessingTraceResponse(
+            metadata=TraceMetadata(
+                trace_id=trace_id,
+                event_id=db_event.id,
+                sensor_id=db_event.source_id,
+                zone_id=zone.id,
+                zone_name=zone.name,
+                timestamp=db_event.timestamp,
+                sequence=sequence,
+                sample_rate_hz=sample_rate,
+                samples_count=sample_count,
+                session_id=db_event.session_id,
+            ),
+            ingestion=RawTelemetryTrace(
+                sensor_id=db_event.source_id,
+                zone_name=zone.name,
+                timestamp=db_event.timestamp,
+                sample_rate_hz=sample_rate,
+                samples_count=sample_count,
+                sequence=sequence,
+                samples_bounded=[],
+                peak_amplitude=db_event.magnitude,
+                rms_amplitude=rms_amp,
+                is_bounded=True,
+            ),
+            conditioning=ConditioningTrace(
+                dc_removal_applied=True,
+                dc_offset_removed=None,
+                filter_applied=True,
+                filter_type="MOVING_AVERAGE",
+                filter_window_size=3 if sample_count >= 5 else None,
+                conditioned_samples_bounded=None,
+            ),
+            event_detection=EventDetectionTrace(
+                detection_threshold=det_threshold,
+                events_detected_count=1,
+                events_detected=True,
+                min_duration_samples=1,
+                merge_gap_samples=2,
+                detected_windows=[],
+            ),
+            features=FeatureExtractionTrace(
+                event_id=db_event.id,
+                peak_amplitude=db_event.magnitude,
+                rms_amplitude=rms_amp,
+                energy=db_event.energy,
+                duration_ms=db_event.duration_ms,
+                frequency_hz=db_event.frequency_hz,
+                sample_count=sample_count,
+                features_dict=meta,
+            ),
+            baseline=BaselineTrace(
+                baseline_id=baseline.id if baseline else None,
+                zone_id=zone.id,
+                mean_magnitude=baseline.mean_magnitude if baseline else None,
+                std_magnitude=baseline.std_magnitude if baseline else None,
+                mean_energy=baseline.mean_energy if baseline else None,
+                std_energy=baseline.std_energy if baseline else None,
+                normal_event_rate=baseline.normal_event_rate if baseline else None,
+                valid_from=baseline.valid_from if baseline else None,
+                valid_until=baseline.valid_until if baseline else None,
+                baseline_available=baseline is not None,
+            ),
+            anomaly=AnomalyEvaluationTrace(
+                evaluated=baseline is not None,
+                is_anomalous=is_anom,
+                magnitude_z_score=z_mag,
+                energy_z_score=z_eng,
+                magnitude_anomalous=abs(z_mag) >= 3.0 if z_mag is not None else False,
+                energy_anomalous=abs(z_eng) >= 3.0 if z_eng is not None else False,
+                z_threshold=3.0,
+                severity=db_event.severity,
+                reasons=reasons,
+            ),
+            persistence=PersistenceTrace(
+                evaluated=True,
+                is_persistent=persistence_res.is_persistent,
+                total_events_in_window=persistence_res.total_events,
+                anomalous_events_in_window=persistence_res.anomalous_events,
+                anomaly_ratio=persistence_res.anomaly_ratio,
+                max_consecutive_anomalies=persistence_res.max_consecutive_anomalies,
+                window_duration_seconds=persistence_res.window_duration_seconds,
+                min_anomaly_count_required=persistence_res.min_anomaly_count_used,
+                min_anomaly_ratio_required=persistence_res.min_anomaly_ratio_used,
+                reasons=list(persistence_res.reasons),
+            ),
+            correlation=CorrelationTrace(
+                evaluated=True,
+                is_cross_sensor_correlated=is_cross_sensor,
+                correlated_group_id=target_group.group_id if target_group else None,
+                participating_sensors=list(target_group.participating_sensors) if target_group else [db_event.source_id],
+                event_ids=[int(eid) for eid in target_group.event_ids] if target_group else [db_event.id],
+                temporal_spread_ms=target_group.temporal_spread_ms if target_group else 0.0,
+                tolerance_seconds=0.025,
+                relative_source_hint=target_group.relative_source_hint if target_group else None,
+                reasons=[target_group.relative_source_hint] if (target_group and target_group.relative_source_hint) else (
+                    ["Multi-sensor cross-sensor correlation confirmed"] if is_cross_sensor else ["Single sensor localized excitation"]
+                ),
+            ),
+            trend=TrendTrace(
+                evaluated=snapshot is not None,
+                overall_trend=snapshot.trend.value if snapshot and snapshot.trend else None,
+                reasons=[f"Trend: {snapshot.trend.value}"] if snapshot and snapshot.trend else [],
+            ),
+            health=HealthTrace(
+                evaluated=snapshot is not None,
+                health_score=snapshot.score if snapshot else None,
+                health_status=snapshot.status if snapshot else None,
+                trend=snapshot.trend.value if snapshot and snapshot.trend else None,
+                deductions=None,
+                reason=snapshot.reason if snapshot else None,
+                evidence_summary=[],
+            ),
+            alert=AlertTrace(
+                alert_generated=alert is not None,
+                alert_id=alert.id if alert else None,
+                alert_severity=alert.severity if alert else None,
+                alert_status=alert.status if alert else None,
+                alert_title=alert.title if alert else None,
+                alert_message=alert.message if alert else None,
+                timestamp=alert.timestamp if alert else None,
+            ),
+        )
+

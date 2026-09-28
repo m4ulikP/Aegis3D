@@ -2,6 +2,9 @@ import {
     AlertResponse,
     EventResponse,
     HealthSummaryResponse,
+    ProcessingTraceResponse,
+    TelemetryIngestRequest,
+    TelemetryLatestResponse,
     ZoneCorrelationResponse,
     ZoneDetailResponse,
     ZoneHealthResponse,
@@ -65,4 +68,18 @@ export const api = {
 
     getAlerts: (): Promise<AlertResponse[]> =>
         apiFetch<AlertResponse[]>("/alerts"),
+
+    getLatestTelemetry: (sensorId?: string): Promise<TelemetryLatestResponse | null> =>
+        apiFetch<TelemetryLatestResponse | null>(
+            sensorId ? `/telemetry/latest?sensor_id=${encodeURIComponent(sensorId)}` : "/telemetry/latest"
+        ),
+
+    getProcessingTrace: (identifier: string): Promise<ProcessingTraceResponse> =>
+        apiFetch<ProcessingTraceResponse>(`/telemetry/${encodeURIComponent(identifier)}/processing-trace`),
+
+    sendTelemetry: (payload: TelemetryIngestRequest): Promise<TelemetryLatestResponse> =>
+        apiFetch<TelemetryLatestResponse>("/telemetry", {
+            method: "POST",
+            body: JSON.stringify(payload),
+        }),
 };

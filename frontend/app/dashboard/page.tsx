@@ -6,9 +6,9 @@ export default function DashboardPage() {
         <main
             style={{
                 position: "relative",
-                width: "100vw",
-                height: "100vh",
-                background: "#111827",
+                width: "100%",
+                height: "100dvh",
+                background: "#020617",
                 overflow: "hidden",
             }}
         >

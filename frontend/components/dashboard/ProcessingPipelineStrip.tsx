@@ -5,9 +5,10 @@ import { theme } from "@/lib/theme";
 
 interface ProcessingPipelineStripProps {
     telemetry: TelemetryLatestResponse | null;
+    onInspect?: () => void;
 }
 
-export default function ProcessingPipelineStrip({ telemetry }: ProcessingPipelineStripProps) {
+export default function ProcessingPipelineStrip({ telemetry, onInspect }: ProcessingPipelineStripProps) {
     if (!telemetry) {
         return (
             <div
@@ -173,15 +174,41 @@ export default function ProcessingPipelineStrip({ telemetry }: ProcessingPipelin
                 }}
             >
                 <span>PROCESSING PIPELINE PROGRESSION</span>
-                <span
-                    style={{
-                        fontFamily: theme.typography.fontMono,
-                        fontSize: 10,
-                        color: theme.status.monitor.text,
-                    }}
-                >
-                    7-STAGE VERIFICATION
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {onInspect && (
+                        <button
+                            onClick={onInspect}
+                            style={{
+                                border: "1px solid rgba(56, 189, 248, 0.4)",
+                                background: "rgba(56, 189, 248, 0.15)",
+                                color: "#38bdf8",
+                                fontSize: 9.5,
+                                fontWeight: 700,
+                                fontFamily: theme.typography.fontMono,
+                                padding: "2px 8px",
+                                borderRadius: 4,
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                letterSpacing: "0.04em",
+                                transition: "all 0.15s ease",
+                            }}
+                            title="Open Telemetry Processing Inspector"
+                        >
+                            🔍 INSPECT
+                        </button>
+                    )}
+                    <span
+                        style={{
+                            fontFamily: theme.typography.fontMono,
+                            fontSize: 10,
+                            color: theme.status.monitor.text,
+                        }}
+                    >
+                        7-STAGE VERIFICATION
+                    </span>
+                </div>
             </div>
 
             {/* Stages Stack */}
