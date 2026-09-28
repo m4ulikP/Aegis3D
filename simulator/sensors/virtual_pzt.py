@@ -1,137 +1,242 @@
-"""Virtual PZT Sensor abstraction for software-first structural telemetry simulation."""
+"""
+Virtual PZT sensor abstraction for the Aegis3D simulator.
+
+The virtual sensor provides:
+- Normal/healthy telemetry
+- Transient and anomaly test signals
+- Physics-inspired PZT tone-burst excitation
+- Propagation of the excitation through a structural path
+- Receiver/acquisition scaling of propagated signals
+
+The simulator is a software replacement for the eventual PZT/ESP32
+sensing layer. It is not an experimentally calibrated hardware model.
+"""
 
 from datetime import datetime, timezone
 import math
 from typing import Any, Dict, List, Optional
 
 try:
-    from simulator.config import DEFAULT_SENSOR_ZONE_MAP, ZONE_MAIN_DECK
+    from simulator.config import (
+        DEFAULT_SENSOR_ZONE_MAP,
+        ZONE_MAIN_DECK,
+    )
+    from simulator.physics import (
+        PropagationPath,
+        ReceiverAcquisition,
+    )
     from simulator.signal_generator import (
         generate_anomaly_signal,
         generate_normal_signal,
+        generate_pzt_tone_burst,
         generate_transient_signal,
     )
 except ImportError:
-    from config import DEFAULT_SENSOR_ZONE_MAP, ZONE_MAIN_DECK
+    from config import (
+        DEFAULT_SENSOR_ZONE_MAP,
+        ZONE_MAIN_DECK,
+    )
+    from physics import (
+        PropagationPath,
+        ReceiverAcquisition,
+    )
     from signal_generator import (
         generate_anomaly_signal,
         generate_normal_signal,
+        generate_pzt_tone_burst,
         generate_transient_signal,
     )
 
 
 class VirtualPZTSensor:
     """
-    Simulated Piezoelectric Transducer (PZT) sensor node.
+    Software representation of a PZT sensor.
 
-    Maintains:
-    - Stable sensor identifier (e.g. 'PZT-Z1-01')
-    - Target domain zone name (e.g. 'Zone 1 - Main Deck Girder')
-    - Sampling rate in Hertz
-    - Monotonically increasing packet sequence counter
+    The sensor itself does not perform backend anomaly detection.
+    It generates representative telemetry that can be sent through
+    the existing Aegis3D telemetry pipeline.
     """
 
     def __init__(
         self,
-        sensor_id: str = "PZT-Z1-01",
+        sensor_id: str,
         zone_name: Optional[str] = None,
         sample_rate_hz: float = 1000.0,
-        initial_sequence: int = 1,
     ) -> None:
-        if not sensor_id or not sensor_id.strip():
+        if not sensor_id:
             raise ValueError("sensor_id cannot be empty")
+
         if sample_rate_hz <= 0:
-            raise ValueError(f"sample_rate_hz must be positive, got {sample_rate_hz}")
-        if initial_sequence < 0:
-            raise ValueError(f"initial_sequence cannot be negative, got {initial_sequence}")
+            raise ValueError(
+                f"sample_rate_hz must be positive, got {sample_rate_hz}"
+            )
 
-        self.sensor_id = sensor_id.strip()
-        # Auto-infer zone from default mapping if not explicitly provided
-        if zone_name and zone_name.strip():
-            self.zone_name = zone_name.strip()
-        else:
-            self.zone_name = DEFAULT_SENSOR_ZONE_MAP.get(self.sensor_id, ZONE_MAIN_DECK)
+        self.sensor_id = sensor_id
 
-        self.sample_rate_hz = float(sample_rate_hz)
-        self.sequence = int(initial_sequence)
+        self.zone_name = (
+            zone_name
+            or DEFAULT_SENSOR_ZONE_MAP.get(sensor_id)
+            or ZONE_MAIN_DECK
+        )
+
+        self.sample_rate_hz = sample_rate_hz
+        self.sequence = 0
+
+        # Receiver/acquisition stage.
+        #
+        # PropagationPath models the structural propagation itself.
+        # ReceiverAcquisition models the scaling introduced by the
+        # receiving/acquisition chain before telemetry is produced.
+        #
+        # The value is intentionally a simulator parameter rather than
+        # a claim about calibrated PZT/ESP32 hardware gain.
+        self.receiver = ReceiverAcquisition(gain=5.0)
+
+    def _next_sequence(self) -> int:
+        sequence = self.sequence
+        self.sequence += 1
+        return sequence
+
+    def generate_healthy_signal(
+        self,
+        sample_count: int = 1000,
+        seed: Optional[int] = 42,
+    ) -> List[float]:
+        """
+        Generate a deterministic healthy structural baseline signal.
+        """
+        return generate_normal_signal(
+            sample_count=sample_count,
+            sample_rate_hz=self.sample_rate_hz,
+            seed=seed,
+        )
+
+    def generate_propagated_signal(
+        self,
+        path: PropagationPath,
+        sample_count: int = 10000,
+        sample_rate_hz: float = 100000.0,
+        seed: Optional[int] = 42,
+    ) -> List[float]:
+        """
+        Generate a PZT tone-burst excitation and propagate it through
+        a reduced-order structural path.
+
+        The resulting signal represents what the receiving PZT would
+        observe after:
+
+            1. PZT excitation
+            2. Structural propagation
+            3. Propagation delay
+            4. Distance-dependent attenuation
+            5. Receiver/acquisition scaling
+
+        This is a physics-inspired simulation, not an experimentally
+        calibrated structural model.
+        """
+
+        # Generate the actuator excitation.
+        #
+        # The current internal physics simulation uses:
+        #   - 100 kHz sampling
+        #   - 10 kHz carrier
+        #   - 5-cycle tone burst
+        #   - amplitude = 0.8
+        #
+        # This is intentionally separate from the existing 1 kHz
+        # backend telemetry generator.
+        source_signal = generate_pzt_tone_burst(
+            sample_count=sample_count,
+            sample_rate_hz=sample_rate_hz,
+            frequency_hz=10_000.0,
+            amplitude=0.8,
+            cycles=5,
+        )
+
+        # Propagate the excitation through the structural path.
+        propagated_signal = path.propagate(
+            source_signal,
+            sample_rate_hz=sample_rate_hz,
+        )
+
+        # Model the receiving/acquisition stage after structural
+        # propagation. The backend receives this scaled signal.
+        received_signal = self.receiver.apply(
+            propagated_signal,
+        )
+
+        return received_signal
 
     def generate_payload(
         self,
         mode: str = "normal",
         sample_count: int = 1000,
-        seed: Optional[int] = None,
-        timestamp: Optional[datetime] = None,
-        samples: Optional[List[float]] = None,
-        detection_threshold: Optional[float] = None,
-        session_id: Optional[int] = None,
+        seed: Optional[int] = 42,
+        threshold: Optional[float] = None,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Generate a telemetry dictionary payload adhering strictly to backend TelemetryIngestRequest.
+        Generate a telemetry payload compatible with the existing
+        Aegis3D telemetry endpoint.
 
-        The simulator sends ONLY signal samples and metadata.
-        It does NOT specify event flags, anomaly decisions, health scores, or alerts.
-
-        Args:
-            mode: Signal generation mode ('normal', 'transient', 'anomaly').
-            sample_count: Number of discrete samples to generate if custom samples not provided.
-            seed: Optional RNG seed for deterministic reproduction.
-            timestamp: UTC datetime; defaults to datetime.now(timezone.utc).
-            samples: Pre-generated sample array override (useful for coordinated multi-sensor tests).
-            detection_threshold: Optional amplitude detection threshold override.
-            session_id: Optional monitoring session ID override.
-
-        Returns:
-            Dict conforming strictly to backend TelemetryIngestRequest schema.
+        Supported modes:
+            normal / healthy
+            transient / event
+            anomaly
         """
-        # Determine sample values
-        if samples is not None:
-            raw_samples = list(samples)
-        elif mode.lower() == "normal":
-            raw_samples = generate_normal_signal(
+
+        mode = mode.lower().strip()
+
+        if sample_count <= 0:
+            raise ValueError(
+                f"sample_count must be positive, got {sample_count}"
+            )
+
+        if mode in {"normal", "healthy"}:
+            samples = self.generate_healthy_signal(
+                sample_count=sample_count,
+                seed=seed,
+            )
+
+        elif mode in {"transient", "event"}:
+            samples = generate_transient_signal(
                 sample_count=sample_count,
                 sample_rate_hz=self.sample_rate_hz,
                 seed=seed,
             )
-        elif mode.lower() in ("transient", "event"):
-            raw_samples = generate_transient_signal(
+
+        elif mode == "anomaly":
+            samples = generate_anomaly_signal(
                 sample_count=sample_count,
                 sample_rate_hz=self.sample_rate_hz,
                 seed=seed,
             )
-        elif mode.lower() == "anomaly":
-            raw_samples = generate_anomaly_signal(
-                sample_count=sample_count,
-                sample_rate_hz=self.sample_rate_hz,
-                seed=seed,
-            )
+
         else:
-            raise ValueError(f"Unsupported signal mode '{mode}'. Choose 'normal', 'transient', or 'anomaly'.")
+            raise ValueError(
+                f"Unsupported signal mode: {mode!r}. "
+                "Expected normal, healthy, transient, event, or anomaly."
+            )
 
-        # Validate finite values
-        for idx, val in enumerate(raw_samples):
-            if val is None or math.isnan(val) or math.isinf(val):
-                raise ValueError(f"Sample at index {idx} is non-finite: {val}")
-
-        ts = timestamp or datetime.now(timezone.utc)
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
-
-        seq = self.sequence
-        self.sequence += 1
+        # Ensure all values are finite before they reach the backend.
+        if not all(math.isfinite(float(value)) for value in samples):
+            raise ValueError(
+                "Generated signal contains non-finite values"
+            )
 
         payload: Dict[str, Any] = {
             "sensor_id": self.sensor_id,
             "zone_name": self.zone_name,
-            "timestamp": ts.isoformat(),
             "sample_rate_hz": self.sample_rate_hz,
-            "sequence": seq,
-            "samples": raw_samples,
+            "samples": samples,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "sequence": self._next_sequence(),
         }
 
-        if detection_threshold is not None:
-            payload["detection_threshold"] = float(detection_threshold)
+        if threshold is not None:
+            payload["threshold"] = float(threshold)
 
         if session_id is not None:
-            payload["session_id"] = int(session_id)
+            payload["session_id"] = session_id
 
         return payload

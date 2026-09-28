@@ -57,7 +57,10 @@ class SimulatorConfig:
             local_env = os.path.join(os.path.dirname(__file__), ".env")
             load_env_file(local_env)
 
-        backend_url = os.getenv("BACKEND_URL", "http://localhost:8000").rstrip("/")
+        backend_url = (
+            os.getenv("SIMULATOR_BACKEND_URL")
+            or os.getenv("BACKEND_URL", "http://localhost:8000")
+        ).rstrip("/")
         telemetry_endpoint = os.getenv("TELEMETRY_ENDPOINT", "/api/v1/telemetry")
         if not telemetry_endpoint.startswith("/"):
             telemetry_endpoint = "/" + telemetry_endpoint

@@ -211,3 +211,73 @@ def generate_correlated_pair(
         sig2[start2:end2] += (peak_amp * attenuation) * env2 * car2
 
     return sig1.astype(float).tolist(), sig2.astype(float).tolist(), float(tdoa_seconds)
+
+def generate_pzt_tone_burst(
+    sample_count: int = 10000,
+    sample_rate_hz: float = 100000.0,
+    frequency_hz: float = 10000.0,
+    amplitude: float = 0.8,
+    cycles: int = 5,
+) -> List[float]:
+    """
+    Generate a windowed PZT tone-burst excitation.
+
+    The excitation is a short sinusoidal burst multiplied by a Hann
+    window. It represents the signal produced by a PZT actuator before
+    propagation through the structure.
+
+    This is a reduced-order, physics-inspired excitation model and is
+    not experimentally calibrated.
+    """
+    if sample_count <= 0:
+        raise ValueError(
+            f"sample_count must be positive, got {sample_count}"
+        )
+
+    if sample_rate_hz <= 0:
+        raise ValueError(
+            f"sample_rate_hz must be positive, got {sample_rate_hz}"
+        )
+
+    if frequency_hz <= 0:
+        raise ValueError(
+            f"frequency_hz must be positive, got {frequency_hz}"
+        )
+
+    if amplitude < 0:
+        raise ValueError(
+            f"amplitude cannot be negative, got {amplitude}"
+        )
+
+    if cycles <= 0:
+        raise ValueError(
+            f"cycles must be positive, got {cycles}"
+        )
+
+    # Duration required for the requested number of carrier cycles.
+    burst_duration_s = cycles / frequency_hz
+
+    burst_samples = max(
+        1,
+        round(burst_duration_s * sample_rate_hz),
+    )
+
+    # Don't allow the burst to exceed the requested signal window.
+    burst_samples = min(burst_samples, sample_count)
+
+    signal = np.zeros(sample_count, dtype=np.float64)
+
+    # Time vector for the burst itself.
+    t = np.arange(burst_samples, dtype=np.float64) / sample_rate_hz
+
+    # Hann-windowed sinusoidal tone burst.
+    carrier = np.sin(2.0 * np.pi * frequency_hz * t)
+
+    if burst_samples > 1:
+        window = np.hanning(burst_samples)
+    else:
+        window = np.ones(1, dtype=np.float64)
+
+    signal[:burst_samples] = amplitude * carrier * window
+
+    return signal.astype(float).tolist()
