@@ -46,14 +46,14 @@ Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
 ### Implemented vs Scaffolded Overview
 
 - **IMPLEMENTED**:
-  - **Backend Steps 1–11**: Complete intelligence engine, PostgreSQL persistence, signal processing, baselining, z-score anomaly detection, temporal persistence, 2-PZT cross-sensor correlation, trend analysis, deterministic SHI, and frontend-consumable REST APIs.
-  - **BIM & IFC Processing**: Offline IFC spatial extraction (`building_metadata.json`, `glb_mapping.json`) mapping 879 structural elements across 5 storeys to 3D GLB node names.
-  - **3D BIM Model Asset**: 3D GLB structural geometry model (`building_demo.glb`, 6.92 MB).
+  - **Backend Telemetry & Processing Engine**: Complete intelligence engine, PostgreSQL persistence, telemetry ingestion (`POST /api/v1/telemetry`), signal processing, baselining, z-score anomaly detection, temporal persistence, 2-PZT cross-sensor correlation, trend analysis, deterministic SHI, and frontend-consumable REST APIs.
+  - **BIM & IFC Processing**: Offline IFC spatial extraction (`building_metadata.json`, `glb_mapping.json`, `zone_bim_mapping.json`) mapping structural elements across storeys to 3D GLB node names.
+  - **3D Digital Twin Viewer**: React Three Fiber / Three.js 3D building viewer (`frontend/components/building/BuildingViewer.tsx`) integrated with canonical Zone ↔ BIM mapping, live health status endpoints, dynamic mesh group highlighting, HUD inspector, and prototype disclaimer.
   - **GIS City Map Interface**: 2.5D MapLibre GL city map component (`CityMap.tsx`) rendering Delhi building footprint polygons (`delhi_buildings.json`).
-- **SCAFFOLDED / NOT YET CONNECTED**:
-  - **Frontend REST Integration**: Frontend application shell is created in Next.js 14, but client-side API fetches to backend REST routes are not yet connected.
-  - **Browser 3D BIM Renderer**: Three.js / React Three Fiber renderer component (`frontend/components/building/`) is scaffolded (`.gitkeep`); `three` dependencies are not yet installed in `frontend/package.json`.
-  - **Real-Time Streaming**: WebSockets and Server-Sent Events (SSE) live data flows are not yet implemented.
+- **SCAFFOLDED / UPCOMING NEXT**:
+  - **Virtual Sensor Simulator**: Virtual signal simulator emitting representative telemetry streams to `POST /api/v1/telemetry` is upcoming work.
+  - **Frontend Live Monitoring Cards**: Live streaming card integration and dynamic real-time telemetry pipeline visualization components.
+  - **Real-Time Streaming**: WebSockets and Server-Sent Events (SSE) live data flows.
 
 ### Implementation Status Breakdown
 
@@ -62,7 +62,8 @@ Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
 | **Domain Models & Schemas** | **Implemented** | Core SQLAlchemy models (`Zone`, `MonitoringSession`, `Event`, `Baseline`, `HealthSnapshot`, `Alert`) & Pydantic DTOs (`backend/app/models/`, `backend/app/schemas/`) |
 | **PostgreSQL Persistence** | **Implemented** | Environment-based DB configuration, SQLAlchemy 2.0 session layer, and Alembic migrations (`backend/app/db/`) |
 | **FastAPI REST Foundation** | **Implemented** | API foundation with liveness `/health` and DB readiness `/health/db` endpoints (`backend/app/api/routes/health.py`) |
-| **Event Ingestion API** | **Implemented** | `POST /api/v1/events` and `GET /api/v1/events/{id}` with validation & service orchestration (`backend/app/api/routes/events.py`) |
+| **Telemetry Ingestion API** | **Implemented** | `POST /api/v1/telemetry` raw discrete signal ingestion, validator, & processing pipeline (`backend/app/api/routes/telemetry.py`) |
+| **Event Ingestion API** | **Implemented** | `POST /api/v1/events` and `GET /api/v1/events/{id}` for pre-detected events (`backend/app/api/routes/events.py`) |
 | **Signal Processing Engine** | **Implemented** | Mean-subtraction DC offset removal, moving average, Butterworth lowpass filtering, event window detection, and FFT feature extraction (`backend/app/processing/`) |
 | **Statistical Baseline Engine** | **Implemented** | Zone-specific historical baseline calculation (mean and standard deviation for magnitude & energy, normal rate, min-data validation) (`backend/app/baseline/`) |
 | **Rule-Based Anomaly Engine** | **Implemented** | Z-score deviation comparison (`|z| >= 3.0` sigma), zero-variance baseline handling, and evidence generation (`backend/app/anomaly/`) |
@@ -72,13 +73,13 @@ Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
 | **Deterministic Trend Analysis** | **Implemented** | Directional trend evaluation (`STABLE`, `INCREASING`, `DECREASING`, `INSUFFICIENT_DATA`) comparing sub-periods (`backend/app/trend/`) |
 | **Structural Health Indicator (SHI)** | **Implemented** | Deterministic 0–100 prototype monitoring score, itemized deductions, and `HealthStatus` mapping (`backend/app/health/`) |
 | **HealthSnapshot Persistence** | **Implemented** | Database persistence of health score, status, trend, reason, and evidence dict (`backend/app/services/health_service.py`) |
-| **Monitoring & Health REST APIs** | **Implemented** | Exposes 8 REST endpoints for Zone listing, Zone detail, Zone events, SHI health, trend, correlation, alerts, and dashboard summary (`backend/app/api/routes/`) |
-| **Automated Test Suite** | **Implemented** | **143 passed / 2 skipped** pytest unit & integration tests (`backend/tests/`) |
-| **BIM/IFC Metadata Pipeline** | **Implemented** | Offline IFC extraction of 879 structural elements and GLB node mapping (`data/processed/bim/`) |
+| **Monitoring & Health REST APIs** | **Implemented** | Exposes REST endpoints for Zone listing, Zone detail, Zone events, SHI health, trend, correlation, alerts, and dashboard summary (`backend/app/api/routes/`) |
+| **Automated Test Suite** | **Implemented** | **164 passed / 1 warning** pytest unit & integration tests (`backend/tests/`) |
+| **BIM/IFC Metadata Pipeline** | **Implemented** | Offline IFC extraction of structural elements, GLB node mapping, and canonical `zone_bim_mapping.json` (`data/processed/bim/`) |
 | **3D Building Model Asset** | **Implemented** | 3D GLB structural asset (`models/glb/building_demo.glb`) |
+| **Browser 3D BIM Viewer** | **Implemented** | Three.js / React Three Fiber building viewer integrated with zone health & BIM highlighting (`frontend/components/building/BuildingViewer.tsx`) |
 | **GIS City Map Component** | **Implemented** | Next.js 14 MapLibre GL 2.5D city map consuming `delhi_buildings.json` (`frontend/components/dashboard/CityMap.tsx`) |
-| **Frontend REST Integration** | *Scaffolded* | Next.js dashboard routes created (`frontend/app/`), client fetch calls to backend REST endpoints pending |
-| **Browser 3D BIM Viewer** | *Scaffolded* | R3F 3D building viewer component folder (`frontend/components/building/.gitkeep`) |
+| **Virtual Sensor Simulator** | *Upcoming* | Prototype telemetry stream generator for virtual sensor simulation |
 | **ESP32 Firmware & Hardware** | *Scaffolded* | PlatformIO structure & PCB schematics (`firmware/`, `hardware/`) |
 
 ---
@@ -86,49 +87,52 @@ Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
 ## Implemented Processing & Data Flow Pipeline
 
 ```text
-[ Raw Signal / Ingestion Input ]
+[ Telemetry Ingestion (POST /api/v1/telemetry) / Discrete Signal Input ]
                  │
                  ▼
-[ 1. Preprocessing ] ──────────────► Mean-subtraction DC offset removal & peak amplitude normalization
+[ 1. Preprocessing ] ──────────────► Mean-subtraction DC offset removal & peak amplitude normalization (`SampledSignal`)
                  │
                  ▼
-[ 2. Filtering ] ──────────────────► Butterworth lowpass filter (scipy.signal) & moving average
+[ 2. Filtering ] ──────────────────► Butterworth lowpass filter (`scipy.signal`) & moving average
                  │
                  ▼
-[ 3. Event Detection ] ────────────► Amplitude thresholding, sample windowing, min-duration & gap merging
+[ 3. Event Detection ] ────────────► Amplitude thresholding, sample windowing, min-duration & gap merging (`process_signal_pipeline`)
                  │
                  ▼
 [ 4. Feature Extraction ] ─────────► Peak amplitude, RMS amplitude, Discrete Signal Energy, FFT Dominant Frequency
                  │
                  ▼
-[ 5. Statistical Baseline ] ───────► Zone-specific historical mean & standard deviation for magnitude & energy
+[ 5. Event Persistence ] ──────────► DB persistence of detected activity window events (`EventRepository` / `EventService`)
                  │
                  ▼
-[ 6. Anomaly Detection ] ──────────► Rule-based standardized deviation (|z| >= 3.0 sigma) & zero-variance handling
+[ 6. Statistical Baseline ] ───────► Zone-specific historical mean & standard deviation for magnitude & energy
                  │
                  ▼
-[ 7. Temporal Persistence ] ───────► Rolling observation window (300s), anomaly ratio, max consecutive anomalies
+[ 7. Anomaly Detection ] ──────────► Rule-based standardized deviation (|z| >= 3.0 sigma) & zero-variance handling (`AnomalyService`)
                  │
                  ▼
-[ 8. 2-PZT Sensor Correlation ] ────► 25ms cross-sensor time-difference-of-arrival (TDOA) correlation & relative source hint
+[ 8. Temporal Persistence ] ───────► Rolling observation window (300s), anomaly ratio, max consecutive anomalies (`CorrelationService`)
                  │
                  ▼
-[ 9. Evidence Aggregation ] ────────► Evidence classification (NORMAL_OBSERVATION to PERSISTENT_AND_CROSS_SENSOR_CORRELATED)
+[ 9. 2-PZT Sensor Correlation ] ────► 25ms cross-sensor time-difference-of-arrival (TDOA) correlation & relative source hint
                  │
                  ▼
-[ 10. Deterministic Trend Analysis ] ► Window sub-period comparison (STABLE, INCREASING, DECREASING, INSUFFICIENT_DATA)
+[ 10. Evidence Aggregation ] ────────► Evidence classification (NORMAL_OBSERVATION to PERSISTENT_AND_CROSS_SENSOR_CORRELATED)
                  │
                  ▼
-[ 11. Structural Health Indicator ] ► Deterministic 0–100 score, itemized deductions, and HealthStatus classification
+[ 11. Deterministic Trend Analysis ] ► Window sub-period comparison (STABLE, INCREASING, DECREASING, INSUFFICIENT_DATA) (`TrendService`)
                  │
                  ▼
-[ 12. HealthSnapshot Persistence ] ─► Database snapshot persistence for monitoring session & zone history
+[ 12. Structural Health Indicator ] ► Deterministic 0–100 score, itemized deductions, and HealthStatus classification (`HealthService`)
                  │
                  ▼
-[ 13. FastAPI REST API Layer ] ─────► 8 REST endpoints exposing zones, health, trend, correlation, alerts & summary
+[ 13. HealthSnapshot & Alert ] ────► DB persistence for health snapshot, trend, and automated alert evaluation
                  │
                  ▼
-[ 14. Frontend Dashboard ] ─────────► Next.js 14 MapLibre GIS map & future live monitoring dashboard UI
+[ 14. FastAPI REST API Layer ] ─────► Exposes telemetry, events, zones, health, trend, correlation, alerts & summary endpoints
+                 │
+                 ▼
+[ 15. 3D Digital Twin & GIS Map ] ──► R3F 3D viewer highlighting mapped BIM components & Next.js MapLibre GIS map
 ```
 
 ---
@@ -221,9 +225,93 @@ Aggregates anomaly, persistence, and correlation into standardized classificatio
   - `score < 45.0` $\implies$ `HealthStatus.HIGH_PRIORITY_INSPECTION`
 - *Note*: Score boundaries and penalty weights are prototype monitoring parameters, NOT certified structural safety thresholds.
 
-### 9. Step 11 — Monitoring & Health REST API Layer (`backend/app/api/routes/`)
-Step 11 exposes all existing backend intelligence through 8 clean, frontend-consumable REST endpoints:
+### 9. Telemetry Ingestion Contract & Existing Processing Pipeline (`POST /api/v1/telemetry`)
+The telemetry ingestion capability exposes an endpoint for accepting raw or representative sampled sensor signals and running them directly through the existing backend processing pipeline.
 
+- **`POST /api/v1/telemetry`**: Ingests raw/representative discrete sensor telemetry, preprocesses signal data via `SampledSignal`, detects structural activity windows using `process_signal_pipeline`, extracts spectral & temporal features, persists detected events (`EventRepository`/`EventService`), evaluates baseline z-score anomalies (`AnomalyService`), computes temporal persistence & 2-PZT cross-sensor correlation (`CorrelationService`), updates zone trend indicators (`TrendService`), evaluates Structural Health Indicators (`HealthService`), updates zone health state, and evaluates system alerts.
+
+#### Conceptual Distinction
+- **`/api/v1/telemetry`**: Accepts **incoming sampled sensor telemetry** (1D amplitude array and sample rate). The backend intelligence engine independently determines if events or anomalies exist within the signal.
+- **`/api/v1/events`**: Accepts or queries **already-detected structural events**.
+
+#### Ingestion Contract Schema (`TelemetryIngestRequest`)
+```json
+{
+  "sensor_id": "PZT-Z1-01",
+  "zone_name": "Zone 1 - Main Deck Girder",
+  "timestamp": "2026-09-28T12:00:00Z",
+  "sample_rate_hz": 1000.0,
+  "sequence": 101,
+  "samples": [0.012, 0.045, -0.023, 0.850, 1.230, -0.950, 0.015, -0.005],
+  "detection_threshold": 0.50,
+  "session_id": 1
+}
+```
+
+#### Response Contract Schema (`TelemetryIngestResponse`)
+```json
+{
+  "status": "success",
+  "telemetry_accepted": true,
+  "sensor_id": "PZT-Z1-01",
+  "zone_id": 1,
+  "zone_name": "Zone 1 - Main Deck Girder",
+  "timestamp": "2026-09-28T12:00:00Z",
+  "samples_count": 8,
+  "sample_rate_hz": 1000.0,
+  "sequence": 101,
+  "events_detected": 1,
+  "events": [
+    {
+      "event_id": 42,
+      "magnitude": 1.23,
+      "energy": 2.85,
+      "duration_ms": 5.0,
+      "frequency_hz": 125.0,
+      "severity": "MODERATE",
+      "is_anomalous": true,
+      "magnitude_z_score": 3.42,
+      "energy_z_score": 3.10,
+      "anomaly_reasons": ["Magnitude z-score +3.42 exceeds threshold (+3.00)"]
+    }
+  ],
+  "extracted_features": {
+    "peak_amplitude": 1.23,
+    "rms_amplitude": 0.597,
+    "energy": 2.85,
+    "duration_ms": 8.0,
+    "frequency_hz": 125.0,
+    "sample_count": 8
+  },
+  "temporal_persistence_confirmed": false,
+  "cross_sensor_correlation_confirmed": false,
+  "health_score": 85.0,
+  "health_status": "MONITOR",
+  "health_trend": "STABLE",
+  "alert_generated": false,
+  "alert_id": null,
+  "alert_severity": null,
+  "alert_title": null,
+  "message": "Telemetry processed successfully: 1 event(s) detected, health updated to MONITOR (85.0)."
+}
+```
+
+#### Pipeline Integration & Component Reuse
+Rather than creating a parallel execution path, telemetry ingestion reuses existing domain repositories, models, and service components:
+- `SampledSignal` for signal validation and mean-subtraction DC offset removal
+- `process_signal_pipeline` for windowing, Butterworth filtering, and FFT feature extraction
+- `EventRepository` & `EventService` for event persistence (reusing existing PostgreSQL models)
+- `AnomalyService` for statistical z-score evaluation against zone baselines
+- `CorrelationService` for rolling temporal persistence and 2-PZT cross-sensor correlation
+- `TrendService` & `HealthService` for deterministic SHI score evaluation and persistence
+- **Zero Database Schema Migrations**: Ingestion requires no new database tables or schema changes; existing PostgreSQL models are fully reused.
+
+---
+
+### 10. Step 11 — Monitoring & Health REST API Layer (`backend/app/api/routes/`)
+Step 11 exposes all existing backend intelligence through clean, frontend-consumable REST endpoints:
+
+- **`POST /api/v1/telemetry`**: Ingests raw sensor telemetry signal arrays, executes processing pipeline, persists detected events, updates zone health, and returns structured processing results (`TelemetryIngestResponse`).
 - **`GET /api/v1/zones`**: Returns all monitoring zones (`ZoneResponse`).
 - **`GET /api/v1/zones/{zone_id}`**: Returns zone detail metadata (`ZoneDetailResponse`), including total event count, active alert count, and latest health status. Returns `404` if zone does not exist.
 - **`GET /api/v1/zones/{zone_id}/events`**: Returns zone event observations (`List[EventResponse]`) with filtering (`limit`, `start_time`, `end_time`, `severity`, `status`). Returns `404` if zone does not exist.
@@ -234,9 +322,9 @@ Step 11 exposes all existing backend intelligence through 8 clean, frontend-cons
 - **`GET /api/v1/health/summary`**: Provides high-level dashboard health summary (`HealthSummaryResponse`), aggregating total zones, status counts, active alerts, recent events, and latest timestamp.
 
 **Key Step 11 Architectural Properties**:
-- **Zero Business Logic Duplication**: Endpoints delegate to `MonitoringService`, which reuses `HealthService`, `TrendService`, `CorrelationService`, and `EventService`.
+- **Zero Business Logic Duplication**: Endpoints delegate to `MonitoringService` and `TelemetryService`, which reuse `HealthService`, `TrendService`, `CorrelationService`, `AnomalyService`, and `EventService`.
 - **Unmodified Intelligence Algorithms**: Step 6–10 algorithms, thresholds, SHI formulas, correlation tolerances, and trend rules were **not** modified.
-- **Zero Database Schema Changes**: No database schema modifications were required. Existing `Zone`, `Event`, `HealthSnapshot`, and `Alert` tables cleanly support all REST queries.
+- **Zero Database Schema Changes**: No database schema modifications or migrations were required. Existing `Zone`, `Event`, `HealthSnapshot`, and `Alert` PostgreSQL models cleanly support all REST operations.
 
 ---
 
@@ -280,12 +368,12 @@ Aegis3D/
 │   ├── app/
 │   │   ├── main.py              # FastAPI app initialization & router setup
 │   │   ├── api/                 # REST router registration
-│   │   │   └── routes/          # REST endpoints (health.py, events.py, zones.py, alerts.py, monitoring.py)
+│   │   │   └── routes/          # REST endpoints (health.py, telemetry.py, events.py, zones.py, alerts.py, monitoring.py)
 │   │   ├── db/                  # Session provider, Base engine, Alembic migrations
 │   │   ├── models/              # Zone, MonitoringSession, Event, Baseline, HealthSnapshot, Alert
-│   │   ├── schemas/             # Pydantic request/response schemas (event.py, zone.py, alert.py, health.py)
+│   │   ├── schemas/             # Pydantic schemas (telemetry.py, event.py, zone.py, alert.py, health.py)
 │   │   ├── repositories/        # EventRepository, BaselineRepository
-│   │   ├── services/            # EventService, BaselineService, AnomalyService, CorrelationService, TrendService, HealthService, MonitoringService
+│   │   ├── services/            # TelemetryService, EventService, BaselineService, AnomalyService, CorrelationService, TrendService, HealthService, MonitoringService
 │   │   ├── processing/          # Signal filtering, window detection & FFT feature extraction
 │   │   ├── baseline/            # Pure zone statistical baseline calculation engine
 │   │   ├── anomaly/             # Pure z-score anomaly detection engine
@@ -294,20 +382,21 @@ Aegis3D/
 │   │   └── health/              # Pure Structural Health Indicator (SHI) calculation engine
 │   ├── scripts/
 │   │   └── demo_signal_processing.py  # Executable signal processing visual demo
-│   └── tests/                   # Complete backend pytest test suite (145 total tests: 143 passed, 2 skipped)
+│   └── tests/                   # Complete backend pytest test suite (164 passed, 1 warning)
 │       ├── test_signal_processing.py
 │       ├── test_baseline.py
 │       ├── test_anomaly.py
 │       ├── test_correlation.py
 │       ├── test_trend.py
 │       ├── test_shi.py
+│       ├── test_api_telemetry.py # Telemetry ingestion contract & processing pipeline tests
 │       ├── test_api_events.py
 │       ├── test_api_health.py
-│       ├── test_api_monitoring.py # 17 tests covering Step 11 REST endpoints
+│       ├── test_api_monitoring.py
 │       ├── test_db_config.py
 │       └── test_models.py
 ├── firmware/esp32/              # ESP32 PlatformIO firmware scaffolding
-├── frontend/                    # Next.js 14 frontend dashboard & MapLibre GL GIS city map
+├── frontend/                    # Next.js 14 frontend dashboard, 3D BIM Viewer & MapLibre GL GIS city map
 ├── hardware/                    # PCB layout, BOM, schematics scaffolding
 ├── docs/                        # Architecture diagrams and BIM_ARCHITECTURE.md
 └── data/                        # Signal and BIM data storage directories
@@ -361,6 +450,7 @@ uvicorn app.main:app --reload
 Verify endpoints:
 - **API Liveness Check**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 - **Database Readiness Check**: [http://127.0.0.1:8000/health/db](http://127.0.0.1:8000/health/db)
+- **Telemetry Ingestion**: `POST http://127.0.0.1:8000/api/v1/telemetry`
 - **List Zones**: [http://127.0.0.1:8000/api/v1/zones](http://127.0.0.1:8000/api/v1/zones)
 - **Health Summary**: [http://127.0.0.1:8000/api/v1/health/summary](http://127.0.0.1:8000/api/v1/health/summary)
 - **List Alerts**: [http://127.0.0.1:8000/api/v1/alerts](http://127.0.0.1:8000/api/v1/alerts)
@@ -374,8 +464,7 @@ Verify endpoints:
 cd backend
 .\.venv\Scripts\python.exe -m pytest tests/
 ```
-*Expected Result*: **`143 passed, 2 skipped in ~10.0s`** (100% pass rate across 11 test modules).  
-*Note*: The 2 skipped tests are PostgreSQL-dependent connection tests (`test_live_postgresql_connectivity` and `test_live_postgresql_session_query`) that skip gracefully when the local PostgreSQL server is offline.
+*Expected Result*: **`164 passed, 1 warning`** across all test modules.
 
 ### 2. Run Signal Processing Visual Demonstration
 ```bash
@@ -404,7 +493,7 @@ As physical hardware coupling progresses, Aegis3D will evaluate:
 
 ## Software-First Milestone Roadmap
 
-### Steps 1–11 (**Completed**)
+### Implemented Backend Capabilities (**Completed**)
 - [x] **Step 1**: Core domain models & schema design
 - [x] **Step 2**: PostgreSQL database persistence & Alembic migrations
 - [x] **Step 3**: FastAPI REST foundation & health endpoints
@@ -416,11 +505,12 @@ As physical hardware coupling progresses, Aegis3D will evaluate:
 - [x] **Step 9**: Deterministic zone trend analysis engine (`STABLE`, `INCREASING`, `DECREASING`, `INSUFFICIENT_DATA`)
 - [x] **Step 10**: Deterministic Structural Health Indicator (SHI 0–100 score, itemized deductions, `HealthSnapshot`)
 - [x] **Step 11**: Monitoring & Structural Health REST API integration endpoints (zones, health, trend, correlation, alerts, summary)
+- [x] **Backend Step 3A/3B**: Telemetry Ingestion Contract & Existing Processing Pipeline (`POST /api/v1/telemetry`)
 
-### Future Milestones (**Next Phases**)
-- [ ] **Step 12**: Next.js client-side REST API integration & live SHI health cards
-- [ ] **Step 13**: Three.js / React Three Fiber 3D BIM structural digital-twin component viewer
-- [ ] **Step 14**: Interactive simulation & demo data streaming workflow
-- [ ] **Step 15**: ESP32 PlatformIO firmware ADC sampling completion & benchtop testing
-- [ ] **Step 16**: MQTT live ingestion adapter integration
-- [ ] **Step 17**: Multi-level alert creation & escalation workflow
+### Future Milestones (**Next Development Stages**)
+- [ ] **Virtual Sensor Simulator**: Stream representative telemetry signals to `POST /api/v1/telemetry` for end-to-end testing
+- [ ] **Frontend Live Telemetry Visualization**: Connect client dashboard cards to live telemetry ingestion results and streaming health status
+- [ ] **3D Digital Twin Dynamic Highlighting**: Interactive real-time component color transitions based on live health score updates in `BuildingViewer.tsx`
+- [ ] **ESP32 Firmware & ADC Sampling**: Firmware completion for physical PZT ADC sampling and benchtop testing
+- [ ] **MQTT Live Ingestion Adapter**: Broker integration for hardware stream forwarding to backend API
+- [ ] **Multi-level Alert Escalation**: Escalation workflows for persistent multi-zone anomalies
