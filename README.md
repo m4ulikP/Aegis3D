@@ -15,29 +15,30 @@
 
 ## Overview
 
-**Aegis3D** is a software-centric structural health monitoring (SHM) and early-warning platform with an optional physical piezoelectric transducer (PZT) sensing input layer. The platform observes structural acoustic and mechanical wave activity in buildings and infrastructure to detect anomalous behavior, evaluate multi-event persistence, correlate multi-sensor arrival times, analyze directional trend trajectories, compute an explainable prototype Structural Health Indicator (SHI), and expose real-time monitoring data via frontend-consumable REST APIs.
+**Aegis3D** is a software-centric structural health monitoring (SHM) and early-warning platform with an optional physical piezoelectric transducer (PZT) sensing input layer. The platform observes structural acoustic and mechanical wave activity in buildings and infrastructure to detect anomalous behavior, evaluate multi-event persistence, correlate multi-sensor arrival times, analyze directional trend trajectories, compute an explainable prototype Structural Health Indicator (SHI), and expose real-time monitoring data and 9-stage processing traces via REST APIs.
 
-While PZT sensors and ESP32 microcontrollers form the planned physical sensing layer, Aegis3D is strictly **Software-First**. All core intelligence—DC offset removal, Butterworth lowpass filtering, threshold-based event detection, FFT feature extraction, zone statistical baselines, z-score anomaly detection, temporal persistence evaluation, 2-PZT time-difference-of-arrival correlation, directional trend analysis, SHI scoring, and REST API routing—is executed by pure, hardware-agnostic Python software modules. The backend functions seamlessly whether fed by live ESP32 streams, imported historical sensor logs, or synthetic signal sources.
+While PZT sensors and ESP32 microcontrollers form the planned physical sensing layer, Aegis3D is strictly **Software-First**. All core intelligence—DC offset removal, Butterworth lowpass filtering, threshold-based event detection, FFT feature extraction, zone statistical baselines, z-score anomaly detection, temporal persistence evaluation, 2-PZT time-difference-of-arrival correlation, directional trend analysis, SHI scoring, processing trace assembly, and REST API routing—is executed by pure, hardware-agnostic Python software modules. The backend functions seamlessly whether fed by live telemetry streams, imported historical sensor logs, or virtual signal simulators.
 
-> **Crucial Technical Disclaimer**: Aegis3D is a continuous monitoring and early-warning software platform. It does **NOT** use machine learning inference, predict structural collapse, guarantee disaster prevention, replace licensed structural engineers, or provide certified engineering safety assessments. Piezoelectric Transducers (PZTs) capture acoustic and mechanical stress waves within materials; they do not directly "see" cracks. Human engineering inspection remains mandatory for actual structural diagnosis.
+> **Crucial Technical Disclaimer**: Aegis3D is a continuous structural health monitoring and early-warning software platform. It does **NOT** use machine learning inference, predict structural collapse, guarantee disaster prevention, replace licensed structural engineers, or provide certified engineering safety assessments. Piezoelectric Transducers (PZTs) capture acoustic and mechanical stress waves within materials; they do not directly "see" cracks or establish 2D/3D crack coordinates. Human engineering inspection remains mandatory for actual structural diagnosis.
 
 ---
 
 ## Role of Hardware in a Software-First Architecture
 
 Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
-- **Input Mechanism**: Physical PZT sensors and ESP32 microcontrollers serve as data collection nodes feeding voltage samples into the backend API or MQTT broker.
-- **Hardware-Agnostic Intelligence**: All signal processing, feature extraction, statistical baseline comparison, correlation, trend, health indicator, and REST API modules are decoupled from specific microcontrollers, sensor hardware, or database ORMs.
+- **Input Mechanism**: Physical PZT sensors and ESP32 microcontrollers serve as collection nodes feeding voltage samples into backend API endpoints or MQTT brokers.
+- **Hardware-Agnostic Intelligence**: All signal processing, feature extraction, statistical baseline comparison, correlation, trend, health indicator, processing trace generation, and REST API modules are decoupled from specific microcontrollers, sensor hardware, or database ORMs.
 - **Data Source Versatility**: Aegis3D evaluates signal inputs identically regardless of whether they originate from physical sensors, imported datasets, or simulator engines.
 
 ---
 
 ## Key Design Principles
 
-1. **Software-Centric & Hardware-Agnostic**: Signal processing, baseline, anomaly, correlation, trend, health evaluation, and REST API routing logic remain pure Python modules.
+1. **Software-Centric & Hardware-Agnostic**: Signal processing, baseline, anomaly, correlation, trend, health evaluation, processing trace assembly, and REST API routing logic remain pure Python modules.
 2. **Zero Machine Learning**: Aegis3D deliberately uses deterministic signal processing, standard deviation metrics, standardized z-scores, rolling window metrics, and rule-based thresholds instead of black-box AI/ML models.
-3. **Explainable Evidence**: All anomaly flags, persistence evaluations, correlation groups, trends, health scores, and API endpoints produce itemized, human-readable evidence statements explaining why a result was produced.
-4. **Relational Domain Integrity**: Standardized PostgreSQL database schema storing structural zones, monitoring sessions, events, baselines, health snapshots, and alerts with foreign key constraints.
+3. **Explainable Evidence & Processing Traces**: All anomaly flags, persistence evaluations, correlation groups, trends, health scores, and API endpoints produce itemized, human-readable evidence statements explaining why a result was produced.
+4. **Authoritative Backend**: The backend is the single source of truth for processing trace metrics, z-scores, persistence decisions, correlation groups, and health scores. The frontend acts strictly as a visual presentation layer.
+5. **Relational Domain Integrity**: Standardized PostgreSQL database schema storing structural zones, monitoring sessions, events, baselines, health snapshots, and alerts with foreign key constraints.
 
 ---
 
@@ -46,368 +47,136 @@ Aegis3D treats physical hardware strictly as an optional data ingestion adapter:
 ### Implemented vs Scaffolded Overview
 
 - **IMPLEMENTED**:
-  - **Backend Telemetry & Processing Engine**: Complete intelligence engine, PostgreSQL persistence, telemetry ingestion (`POST /api/v1/telemetry`), signal processing, baselining, z-score anomaly detection, temporal persistence, 2-PZT cross-sensor correlation, trend analysis, deterministic SHI, and frontend-consumable REST APIs.
+  - **Backend Telemetry & Processing Trace Engine**: Complete 9-stage intelligence engine, PostgreSQL persistence, telemetry ingestion (`POST /api/v1/telemetry`), processing trace endpoint (`GET /api/v1/telemetry/{identifier}/processing-trace`), signal processing, baselining, z-score anomaly detection, temporal persistence, 2-PZT cross-sensor correlation, trend analysis, deterministic SHI, and REST APIs.
+  - **Frontend Telemetry Processing Inspector**: Focused 9-stage evidence viewer component (`TelemetryProcessingInspector.tsx`) featuring dynamic sliding-window fading pagination, clickable indicator dots, anchored hover tooltips, directional page slide transitions, keyboard accessibility (`aria-current="step"`, high-contrast focus rings), reduced motion support (`prefers-reduced-motion: reduce`), SVG engineering icons, and compact first-viewport hierarchy on Page 9.
+  - **Virtual Sensor Simulator**: Physics-inspired multi-sensor signal simulator (`simulator/`) with PZT tone burst excitation generators (`generate_pzt_tone_burst`), structural path propagation models, and virtual PZT receivers emitting streams to `POST /api/v1/telemetry`.
   - **BIM & IFC Processing**: Offline IFC spatial extraction (`building_metadata.json`, `glb_mapping.json`, `zone_bim_mapping.json`) mapping structural elements across storeys to 3D GLB node names.
-  - **3D Digital Twin Viewer**: React Three Fiber / Three.js 3D building viewer (`frontend/components/building/BuildingViewer.tsx`) integrated with canonical Zone ↔ BIM mapping, live health status endpoints, dynamic mesh group highlighting, HUD inspector, and prototype disclaimer.
+  - **3D Digital Twin Viewer**: Three.js / React Three Fiber building viewer (`frontend/components/building/DigitalTwinViewer.tsx`) integrated with canonical Zone ↔ BIM mapping, live health status endpoints, dynamic mesh group highlighting, HUD inspector launch triggers, and prototype disclaimers.
   - **GIS City Map Interface**: 2.5D MapLibre GL city map component (`CityMap.tsx`) rendering Delhi building footprint polygons (`delhi_buildings.json`).
-- **SCAFFOLDED / UPCOMING NEXT**:
-  - **Virtual Sensor Simulator**: Virtual signal simulator emitting representative telemetry streams to `POST /api/v1/telemetry` is upcoming work.
-  - **Frontend Live Monitoring Cards**: Live streaming card integration and dynamic real-time telemetry pipeline visualization components.
-  - **Real-Time Streaming**: WebSockets and Server-Sent Events (SSE) live data flows.
-
-### Implementation Status Breakdown
-
-| Component | Status | Description / Location |
-| :--- | :--- | :--- |
-| **Domain Models & Schemas** | **Implemented** | Core SQLAlchemy models (`Zone`, `MonitoringSession`, `Event`, `Baseline`, `HealthSnapshot`, `Alert`) & Pydantic DTOs (`backend/app/models/`, `backend/app/schemas/`) |
-| **PostgreSQL Persistence** | **Implemented** | Environment-based DB configuration, SQLAlchemy 2.0 session layer, and Alembic migrations (`backend/app/db/`) |
-| **FastAPI REST Foundation** | **Implemented** | API foundation with liveness `/health` and DB readiness `/health/db` endpoints (`backend/app/api/routes/health.py`) |
-| **Telemetry Ingestion API** | **Implemented** | `POST /api/v1/telemetry` raw discrete signal ingestion, validator, & processing pipeline (`backend/app/api/routes/telemetry.py`) |
-| **Event Ingestion API** | **Implemented** | `POST /api/v1/events` and `GET /api/v1/events/{id}` for pre-detected events (`backend/app/api/routes/events.py`) |
-| **Signal Processing Engine** | **Implemented** | Mean-subtraction DC offset removal, moving average, Butterworth lowpass filtering, event window detection, and FFT feature extraction (`backend/app/processing/`) |
-| **Statistical Baseline Engine** | **Implemented** | Zone-specific historical baseline calculation (mean and standard deviation for magnitude & energy, normal rate, min-data validation) (`backend/app/baseline/`) |
-| **Rule-Based Anomaly Engine** | **Implemented** | Z-score deviation comparison (`|z| >= 3.0` sigma), zero-variance baseline handling, and evidence generation (`backend/app/anomaly/`) |
-| **Temporal Persistence** | **Implemented** | Rolling window persistence evaluation, anomaly ratio, consecutive anomalies, and window boundary checks (`backend/app/correlation/temporal.py`) |
-| **Two-PZT Event Correlation** | **Implemented** | Cross-sensor event correlation across 25ms tolerance, TDOA spread, and relative source indication (`backend/app/correlation/sensor_correlation.py`) |
-| **Evidence Aggregation** | **Implemented** | Unified classification (`NORMAL_OBSERVATION` to `PERSISTENT_AND_CROSS_SENSOR_CORRELATED`) (`backend/app/correlation/evidence.py`) |
-| **Deterministic Trend Analysis** | **Implemented** | Directional trend evaluation (`STABLE`, `INCREASING`, `DECREASING`, `INSUFFICIENT_DATA`) comparing sub-periods (`backend/app/trend/`) |
-| **Structural Health Indicator (SHI)** | **Implemented** | Deterministic 0–100 prototype monitoring score, itemized deductions, and `HealthStatus` mapping (`backend/app/health/`) |
-| **HealthSnapshot Persistence** | **Implemented** | Database persistence of health score, status, trend, reason, and evidence dict (`backend/app/services/health_service.py`) |
-| **Monitoring & Health REST APIs** | **Implemented** | Exposes REST endpoints for Zone listing, Zone detail, Zone events, SHI health, trend, correlation, alerts, and dashboard summary (`backend/app/api/routes/`) |
-| **Automated Test Suite** | **Implemented** | **164 passed / 1 warning** pytest unit & integration tests (`backend/tests/`) |
-| **BIM/IFC Metadata Pipeline** | **Implemented** | Offline IFC extraction of structural elements, GLB node mapping, and canonical `zone_bim_mapping.json` (`data/processed/bim/`) |
-| **3D Building Model Asset** | **Implemented** | 3D GLB structural asset (`models/glb/building_demo.glb`) |
-| **Browser 3D BIM Viewer** | **Implemented** | Three.js / React Three Fiber building viewer integrated with zone health & BIM highlighting (`frontend/components/building/DigitalTwinViewer.tsx`) |
-| **Processing Pipeline Strip** | **Implemented** | 7-stage deterministic signal processing evidence visualization component with 3-column CSS Grid layout (`frontend/components/dashboard/ProcessingPipelineStrip.tsx`) |
-| **GIS City Map Component** | **Implemented** | Next.js 14 MapLibre GL 2.5D city map consuming `delhi_buildings.json` (`frontend/components/dashboard/CityMap.tsx`) |
-| **Virtual Sensor Simulator** | **Implemented** | Multi-sensor synthetic waveform generator emitting telemetry streams to `POST /api/v1/telemetry` (`simulator/`) |
-| **ESP32 Firmware & Hardware** | *Scaffolded* | PlatformIO structure & PCB schematics (`firmware/`, `hardware/`) |
+  - **Automated Test Suite**: **173 passed / 1 warning** backend pytest unit & integration tests (`backend/tests/`).
+- **UPCOMING / FUTURE MILESTONES**:
+  - **Live Processing Stream**: Real-time WebSockets / SSE streaming layer connecting live background processing updates directly into the inspector UI.
+  - **ESP32 Benchtop Hardware**: Full benchtop validation with physical ESP32 PZT sampling hardware.
 
 ---
 
 ## Implemented Processing & Data Flow Pipeline
 
 ```text
-[ Telemetry Ingestion (POST /api/v1/telemetry) / Discrete Signal Input ]
-                 │
-                 ▼
-[ 1. Preprocessing ] ──────────────► Mean-subtraction DC offset removal & peak amplitude normalization (`SampledSignal`)
-                 │
-                 ▼
-[ 2. Filtering ] ──────────────────► Butterworth lowpass filter (`scipy.signal`) & moving average
-                 │
-                 ▼
-[ 3. Event Detection ] ────────────► Amplitude thresholding, sample windowing, min-duration & gap merging (`process_signal_pipeline`)
-                 │
-                 ▼
-[ 4. Feature Extraction ] ─────────► Peak amplitude, RMS amplitude, Discrete Signal Energy, FFT Dominant Frequency
-                 │
-                 ▼
-[ 5. Event Persistence ] ──────────► DB persistence of detected activity window events (`EventRepository` / `EventService`)
-                 │
-                 ▼
-[ 6. Statistical Baseline ] ───────► Zone-specific historical mean & standard deviation for magnitude & energy
-                 │
-                 ▼
-[ 7. Anomaly Detection ] ──────────► Rule-based standardized deviation (|z| >= 3.0 sigma) & zero-variance handling (`AnomalyService`)
-                 │
-                 ▼
-[ 8. Temporal Persistence ] ───────► Rolling observation window (300s), anomaly ratio, max consecutive anomalies (`CorrelationService`)
-                 │
-                 ▼
-[ 9. 2-PZT Sensor Correlation ] ────► 25ms cross-sensor time-difference-of-arrival (TDOA) correlation & relative source hint
-                 │
-                 ▼
-[ 10. Evidence Aggregation ] ────────► Evidence classification (NORMAL_OBSERVATION to PERSISTENT_AND_CROSS_SENSOR_CORRELATED)
-                 │
-                 ▼
-[ 11. Deterministic Trend Analysis ] ► Window sub-period comparison (STABLE, INCREASING, DECREASING, INSUFFICIENT_DATA) (`TrendService`)
-                 │
-                 ▼
-[ 12. Structural Health Indicator ] ► Deterministic 0–100 score, itemized deductions, and HealthStatus classification (`HealthService`)
-                 │
-                 ▼
-[ 13. HealthSnapshot & Alert ] ────► DB persistence for health snapshot, trend, and automated alert evaluation
-                 │
-                 ▼
-[ 14. FastAPI REST API Layer ] ─────► Exposes telemetry, events, zones, health, trend, correlation, alerts & summary endpoints
-                 │
-                 ▼
-[ 15. 3D Digital Twin & GIS Map ] ──► R3F 3D viewer highlighting mapped BIM components & Next.js MapLibre GIS map
+[ Simulator / Sensor Telemetry ]
+               │
+               ▼
+ [ POST /api/v1/telemetry ]
+               │
+               ▼
+ [ GET /api/v1/telemetry/{identifier}/processing-trace ]
+               │
+               ▼
+ ┌─────────────────────────────────────────────────────────┐
+ │               9-STAGE PROCESSING TRACE                   │
+ ├─────────────────────────────────────────────────────────┤
+ │  1. INGESTION           Raw signal & bounds metadata    │
+ │  2. CONDITIONING        DC removal & lowpass filter     │
+ │  3. EVENT DETECTION     Threshold & window detection    │
+ │  4. FEATURE EXTRACTION  Peak, RMS, Energy, FFT Freq     │
+ │  5. BASELINE REFERENCE  Zone mean & std deviation norms │
+ │  6. ANOMALY EVALUATION  Standardized z-score deviation  │
+ │  7. PERSISTENCE         Rolling temporal anomaly ratio  │
+ │  8. CORRELATION         2-PZT TDOA relative source      │
+ │  9. HEALTH & ALERT      SHI score (0–100) & alert box   │
+ └─────────────────────────────────────────────────────────┘
+               │
+               ▼
+ [ Telemetry Processing Inspector (Frontend Visualization Layer) ]
 ```
 
 ---
 
-## Detailed Component Specifications
+## Detailed Processing Trace Stages
 
-### 1. Signal Processing Foundation (`backend/app/processing/`)
-- **`SampledSignal`**: Immutable 1D signal container enforcing positive sample rates (`sample_rate > 0`) and validating against `NaN`/`Inf`.
-- **Preprocessing**: Mean-subtraction DC offset removal preserving signal metadata.
-- **Filtering**: Moving average filter (`mode="same"`) and Butterworth lowpass filter (`scipy.signal.butter` / `filtfilt`) with Nyquist boundary checks.
-- **Event Detection**: Amplitude thresholding identifying active sample windows, filtering transient noise (`min_duration_samples`), and merging sub-threshold gaps (`merge_gap_samples`).
-- **Feature Extraction**:
-  - **Peak Amplitude**: `max(|x[n]|)`
-  - **RMS Amplitude**: Root Mean Square of sampled amplitudes
-  - **Discrete Signal Energy**: `sum(x[n]^2)` (*Note: Digital signal metric, not physical joules*)
-  - **Duration & Sample Count**: Window duration in milliseconds and sample count.
-  - **Dominant Frequency**: Real FFT spectrum analysis (`np.fft.rfft`) with zero-padding and DC bin exclusion.
+The processing trace API (`GET /api/v1/telemetry/{identifier}/processing-trace`) assembles full trace evidence across nine sequential stages:
 
-### 2. Zone Statistical Baseline Engine (`backend/app/baseline/`)
-- Computes zone-specific historical baseline parameters over a date window `[valid_from, valid_until]`.
-- Calculates arithmetic mean and population standard deviation (`ddof=0`) for event magnitude and signal energy.
-- Calculates normal historical event rate (events per second).
-- Requires minimum qualifying events (`DEFAULT_MIN_EVENTS = 10`) and excludes `DISMISSED` events.
-
-### 3. Rule-Based Anomaly Detection (`backend/app/anomaly/`)
-- Computes standardized z-scores for magnitude and energy:
-  ```text
-  z_magnitude = (magnitude - mean_magnitude) / std_magnitude
-  z_energy    = (energy - mean_energy) / std_energy
-  ```
-- Evaluates absolute deviation against configurable threshold (`|z| >= 3.0` sigma).
-- Evaluates magnitude and energy independently (`is_anomalous = mag_anomalous or eng_anomalous`).
-- **Zero-Standard-Deviation Handling**: When baseline standard deviation is zero (`std = 0`):
-  - Event value equals mean $\implies z = 0.0$, normal.
-  - Event value differs from mean $\implies z = 0.0$, flagged anomalous with explainable zero-variance evidence.
-  - Strictly avoids `NaN`, `infinity`, or division-by-zero errors.
-
-### 4. Temporal Persistence Evaluation (`backend/app/correlation/temporal.py`)
-- Evaluates anomaly sequence over a rolling observation window (default `300.0` seconds).
-- Computes total events, anomalous events, anomaly ratio (`anomalous events / total events`), and max consecutive anomalous events.
-- Persistence satisfied when BOTH conditions hold:
-  ```text
-  anomalous event count >= min_count (default: 3)
-  AND
-  anomaly ratio >= min_ratio (default: 0.50)
-  ```
-
-### 5. Two-PZT Sensor Event Correlation (`backend/app/correlation/sensor_correlation.py`)
-- Correlates events across two distinct PZT sensors within a configurable temporal tolerance window (default `25` ms).
-- Computes temporal spread in milliseconds (`delta_t = |t2 - t1|`) and relative arrival time difference.
-- Generates relative source indication hints (e.g. `"Event arrived first at sensor PZT-01 (lead time: 4.20 ms relative to PZT-02)"`).
-- *Note*: Provides relative source arrival order along a 2-sensor axis, **NOT** precise 2D or 3D spatial triangulation.
-
-### 6. Evidence Aggregation (`backend/app/correlation/evidence.py`)
-Aggregates anomaly, persistence, and correlation into standardized classifications:
-- `NORMAL_OBSERVATION`: Event within normal baseline bounds.
-- `INDIVIDUAL_ANOMALY`: Isolated anomaly without persistence or cross-sensor correlation.
-- `PERSISTENT_ANOMALY`: Anomaly meeting rolling-window temporal persistence criteria.
-- `CROSS_SENSOR_CORRELATED`: Anomaly detected across 2+ sensors within tolerance window.
-- `PERSISTENT_AND_CROSS_SENSOR_CORRELATED`: Anomaly meeting both persistence and multi-sensor correlation.
-
-### 7. Deterministic Trend Analysis (`backend/app/trend/`)
-- Divides a configurable analysis window (default `3600.0` seconds) into two contiguous sub-periods:
-  - **Earlier Sub-Period**: `[window_start, midpoint)`
-  - **Later Sub-Period**: `[midpoint, window_end]`
-- Calculates normalized anomaly rate (`anomalous events / total events`) for each sub-period and computes delta (`rate_delta = rate_later - rate_earlier`).
-- Evaluates directional trend classification:
-  - `INCREASING`: Anomaly rate delta `>= threshold` (default: 0.10) or magnitude/evidence rising.
-  - `DECREASING`: Anomaly rate declining toward baseline.
-  - `STABLE`: Anomaly rate and magnitude remain within tolerance.
-  - `INSUFFICIENT_DATA`: Fewer than `min_events_per_period` (default: 2) in either sub-period. *Preserves data uncertainty without artificial penalties.*
-- Identifies and documents divergent component trends (e.g. rate increasing while magnitude decreases).
-
-### 8. Structural Health Indicator (SHI) (`backend/app/health/`)
-- Converts accumulated evidence from Steps 7–9 into a deterministic prototype score bounded strictly to the range `0–100`:
-  ```text
-  raw_score = base_score - (anomaly_penalty + persistence_penalty + cross_sensor_penalty + trend_penalty)
-  score = clamp(raw_score, 0, 100)
-  ```
-- Default prototype configuration:
-  - `base_score = 100.0`
-  - `anomaly_penalty = 15.0` (applied for individual anomaly activity)
-  - `persistence_penalty = 20.0` (applied for Step 8 temporal persistence)
-  - `cross_sensor_penalty = 25.0` (applied for Step 8 cross-sensor correlation)
-  - `increasing_trend_penalty = 15.0` (applied for Step 9 `INCREASING` trend)
-- Prototype Status Mapping:
-  - `score >= 90.0` $\implies$ `HealthStatus.NORMAL`
-  - `70.0 <= score < 90.0` $\implies$ `HealthStatus.MONITOR`
-  - `45.0 <= score < 70.0` $\implies$ `HealthStatus.INSPECTION_ADVISED`
-  - `score < 45.0` $\implies$ `HealthStatus.HIGH_PRIORITY_INSPECTION`
-- *Note*: Score boundaries and penalty weights are prototype monitoring parameters, NOT certified structural safety thresholds.
-
-### 9. Telemetry Ingestion Contract & Existing Processing Pipeline (`POST /api/v1/telemetry`)
-The telemetry ingestion capability exposes an endpoint for accepting raw or representative sampled sensor signals and running them directly through the existing backend processing pipeline.
-
-- **`POST /api/v1/telemetry`**: Ingests raw/representative discrete sensor telemetry, preprocesses signal data via `SampledSignal`, detects structural activity windows using `process_signal_pipeline`, extracts spectral & temporal features, persists detected events (`EventRepository`/`EventService`), evaluates baseline z-score anomalies (`AnomalyService`), computes temporal persistence & 2-PZT cross-sensor correlation (`CorrelationService`), updates zone trend indicators (`TrendService`), evaluates Structural Health Indicators (`HealthService`), updates zone health state, and evaluates system alerts.
-
-#### Conceptual Distinction
-- **`/api/v1/telemetry`**: Accepts **incoming sampled sensor telemetry** (1D amplitude array and sample rate). The backend intelligence engine independently determines if events or anomalies exist within the signal.
-- **`/api/v1/events`**: Accepts or queries **already-detected structural events**.
-
-#### Ingestion Contract Schema (`TelemetryIngestRequest`)
-```json
-{
-  "sensor_id": "PZT-Z1-01",
-  "zone_name": "Zone 1 - Main Deck Girder",
-  "timestamp": "2026-09-28T12:00:00Z",
-  "sample_rate_hz": 1000.0,
-  "sequence": 101,
-  "samples": [0.012, 0.045, -0.023, 0.850, 1.230, -0.950, 0.015, -0.005],
-  "detection_threshold": 0.50,
-  "session_id": 1
-}
-```
-
-#### Response Contract Schema (`TelemetryIngestResponse`)
-```json
-{
-  "status": "success",
-  "telemetry_accepted": true,
-  "sensor_id": "PZT-Z1-01",
-  "zone_id": 1,
-  "zone_name": "Zone 1 - Main Deck Girder",
-  "timestamp": "2026-09-28T12:00:00Z",
-  "samples_count": 8,
-  "sample_rate_hz": 1000.0,
-  "sequence": 101,
-  "events_detected": 1,
-  "events": [
-    {
-      "event_id": 42,
-      "magnitude": 1.23,
-      "energy": 2.85,
-      "duration_ms": 5.0,
-      "frequency_hz": 125.0,
-      "severity": "MODERATE",
-      "is_anomalous": true,
-      "magnitude_z_score": 3.42,
-      "energy_z_score": 3.10,
-      "anomaly_reasons": ["Magnitude z-score +3.42 exceeds threshold (+3.00)"]
-    }
-  ],
-  "extracted_features": {
-    "peak_amplitude": 1.23,
-    "rms_amplitude": 0.597,
-    "energy": 2.85,
-    "duration_ms": 8.0,
-    "frequency_hz": 125.0,
-    "sample_count": 8
-  },
-  "temporal_persistence_confirmed": false,
-  "cross_sensor_correlation_confirmed": false,
-  "health_score": 85.0,
-  "health_status": "MONITOR",
-  "health_trend": "STABLE",
-  "alert_generated": false,
-  "alert_id": null,
-  "alert_severity": null,
-  "alert_title": null,
-  "message": "Telemetry processed successfully: 1 event(s) detected, health updated to MONITOR (85.0)."
-}
-```
-
-#### Pipeline Integration & Component Reuse
-Rather than creating a parallel execution path, telemetry ingestion reuses existing domain repositories, models, and service components:
-- `SampledSignal` for signal validation and mean-subtraction DC offset removal
-- `process_signal_pipeline` for windowing, Butterworth filtering, and FFT feature extraction
-- `EventRepository` & `EventService` for event persistence (reusing existing PostgreSQL models)
-- `AnomalyService` for statistical z-score evaluation against zone baselines
-- `CorrelationService` for rolling temporal persistence and 2-PZT cross-sensor correlation
-- `TrendService` & `HealthService` for deterministic SHI score evaluation and persistence
-- **Zero Database Schema Migrations**: Ingestion requires no new database tables or schema changes; existing PostgreSQL models are fully reused.
+1. **Ingestion Stage**: Captures raw discrete sensor amplitude samples, sample rate (Hz), timestamp, total sample count, peak amplitude, and bounding window state.
+2. **Conditioning Stage**: Applies mean-subtraction DC offset removal and Butterworth lowpass filtering (`scipy.signal`), recording DC offset and window parameters.
+3. **Event Detection Stage**: Evaluates signal amplitude against detection threshold, identifies active activity windows, filters noise via minimum sample duration, and merges sub-threshold gaps.
+4. **Feature Extraction Stage**: Extracts quantitative metrics for detected events:
+   - **Peak Amplitude**: $\max(|x[n]|)$
+   - **RMS Amplitude**: Root Mean Square of sampled amplitudes
+   - **Discrete Signal Energy**: $\sum x[n]^2$ (*Digital signal metric*)
+   - **Duration & Sample Count**: Active window duration in milliseconds and point count.
+   - **Dominant Frequency**: Real FFT spectrum analysis (`np.fft.rfft`) with zero-padding and DC bin exclusion.
+5. **Baseline Reference Stage**: Compares extracted event features against historical zone baseline statistical norms (arithmetic mean and population standard deviation for magnitude and energy, normal event rate).
+6. **Anomaly Evaluation Stage**: Computes standardized z-scores for magnitude and energy:
+   $$z_{\text{magnitude}} = \frac{\text{magnitude} - \mu_{\text{magnitude}}}{\sigma_{\text{magnitude}}}, \quad z_{\text{energy}} = \frac{\text{energy} - \mu_{\text{energy}}}{\sigma_{\text{energy}}}$$
+   Flags events exceeding standardized threshold ($|z| \ge 3.0$) with zero-variance baseline protection.
+7. **Persistence Stage**: Evaluates rolling anomaly ratio over an observation window (default 300s), tracking total events, anomalous events, anomaly ratio, and maximum consecutive anomalies.
+8. **Cross-Sensor Correlation Stage**: Correlates events across two distinct PZT sensors within temporal tolerance (default 25ms), computing Time-Difference-of-Arrival (TDOA) spread ($\Delta t = |t_2 - t_1|$) and relative source indication lead/lag hints.
+9. **Health & Alert Stage**: Computes the prototype Structural Health Indicator (SHI 0–100 score), itemized score deduction penalties, health status classification (`NORMAL`, `MONITOR`, `INSPECTION_ADVISED`, `HIGH_PRIORITY_INSPECTION`), directional trend, system alert dispatch, and canonical disclaimer.
 
 ---
 
-### 10. Step 11 — Monitoring & Health REST API Layer (`backend/app/api/routes/`)
-Step 11 exposes all existing backend intelligence through clean, frontend-consumable REST endpoints:
+## Telemetry Processing Inspector UI (`frontend/components/dashboard/`)
 
-- **`POST /api/v1/telemetry`**: Ingests raw sensor telemetry signal arrays, executes processing pipeline, persists detected events, updates zone health, and returns structured processing results (`TelemetryIngestResponse`).
-- **`GET /api/v1/zones`**: Returns all monitoring zones (`ZoneResponse`).
-- **`GET /api/v1/zones/{zone_id}`**: Returns zone detail metadata (`ZoneDetailResponse`), including total event count, active alert count, and latest health status. Returns `404` if zone does not exist.
-- **`GET /api/v1/zones/{zone_id}/events`**: Returns zone event observations (`List[EventResponse]`) with filtering (`limit`, `start_time`, `end_time`, `severity`, `status`). Returns `404` if zone does not exist.
-- **`GET /api/v1/zones/{zone_id}/health`**: Returns latest Structural Health Indicator score, status, trend, reason, timestamp, evidence payload, and embedded safety disclaimer (`ZoneHealthResponse`). Returns `404` if zone does not exist.
-- **`GET /api/v1/zones/{zone_id}/trend`**: Exposes Step 9 deterministic trend analysis (`ZoneTrendResponse`), returning overall trend direction (`STABLE`, `INCREASING`, `DECREASING`, `INSUFFICIENT_DATA`), rate delta, magnitude delta, and sub-period metrics. Returns `404` if zone does not exist.
-- **`GET /api/v1/zones/{zone_id}/correlation`**: Exposes Step 8 temporal persistence and 2-PZT cross-sensor correlation groups (`ZoneCorrelationResponse`), with relative arrival hints and explicit non-localization note. Returns `404` if zone does not exist.
-- **`GET /api/v1/alerts`**: Returns actionable system alerts (`List[AlertResponse]`) with optional filtering (`zone_id`, `status`, `severity`, `limit`).
-- **`GET /api/v1/health/summary`**: Provides high-level dashboard health summary (`HealthSummaryResponse`), aggregating total zones, status counts, active alerts, recent events, and latest timestamp.
+The frontend contains a dedicated Telemetry Processing Inspector component (`TelemetryProcessingInspector.tsx`) designed specifically for narrow workspace analysis (~420px panel):
 
-**Key Step 11 Architectural Properties**:
-- **Zero Business Logic Duplication**: Endpoints delegate to `MonitoringService` and `TelemetryService`, which reuse `HealthService`, `TrendService`, `CorrelationService`, `AnomalyService`, and `EventService`.
-- **Unmodified Intelligence Algorithms**: Step 6–10 algorithms, thresholds, SHI formulas, correlation tolerances, and trend rules were **not** modified.
-- **Zero Database Schema Changes**: No database schema modifications or migrations were required. Existing `Zone`, `Event`, `HealthSnapshot`, and `Alert` PostgreSQL models cleanly support all REST operations.
+- **Focus & Hierarchy**: Designed as an engineering control-room instrument rather than a generic SaaS dashboard. Employs dark slate flat surfaces, crisp 1px borders, restrained typography, and Title Case section headings.
+- **Dynamic Fading Stage Pagination (`DynamicStagePagination`)**: Horizontally centered 7-dot sliding window pagination bar (`[ ← ] ○ ○ ● ○ ○ ○ ○ [ → ]`). Indicator opacity fades progressively based on stage distance ($d_0 = 1.0$, $d_1 = 0.75$, $d_2 = 0.50$, $d_3 = 0.28$, $d_4+ = 0.14$).
+- **Anchored Micro-Tooltips**: Hovering any stage dot reveals a crisp monospace stage label anchored directly above the dot (`role="tooltip"`), following the dot without mouse-tracking or layout shifts.
+- **Directional Page Slide Transitions**: Moving forward (`target > current`) slides content in from `+16px` right; moving backward (`target < current`) slides content in from `-16px` left (`260ms cubic-bezier`).
+- **Keyboard Accessibility & Reduced Motion**: Full keyboard control (`aria-current="step"`, high-contrast focus rings via `.stage-dot-btn:focus-visible`). Complete motion disabling under `@media (prefers-reduced-motion: reduce)`.
+- **Page 9 First-Viewport Layout**: Consolidated SHI score (`40.0 / 100`), status badge (`HIGH PRIORITY INSPECTION`), trend, score deductions grid (`−15 pts`, `−20 pts`, `−25 pts`, `total_deductions −60 pts`), and System Alert Dispatch box into the top viewport area.
 
 ---
 
-## Mandatory SHI Limitation Disclaimer
+## Cross-Sensor Correlation & Relative Source Indication
 
-Every `StructuralHealthResult` and `ZoneHealthResponse` output embeds the following mandatory safety disclaimer:
+Aegis3D supports multi-sensor event correlation across PZT transducers:
+- **TDOA Relationship**: Calculates arrival time difference ($\Delta t = |t_2 - t_1|$) for events falling within the 25ms tolerance window.
+- **Relative Source Indication**: Generates relative arrival lead/lag hints (e.g. `"Event arrived first at sensor PZT-Z1-01 (lead time: 4.20 ms relative to PZT-Z1-02)"`).
 
-> **"SHI is a prototype evidence-based monitoring indicator derived from observed signal/event behavior. It is not a certified structural safety score and does not independently establish structural damage or failure."**
-
-Aegis3D explicitly does **NOT**:
-- Predict structural collapse or catastrophic failure
-- Independently diagnose physical cracks or material fatigue
-- Replace physical on-site structural engineering inspections
-- Provide legal or certified structural safety guarantees
+> **Explicit Non-Localization Note**: The 2-PZT correlation module provides **relative arrival order along a 2-sensor path**. It does **NOT** compute exact 2D/3D spatial coordinates, physical crack coordinates, or precise damage localization.
 
 ---
 
-## Hardware & Frontend Integration Status
+## Structural Health Indicator (SHI) Specification
 
-### Hardware Integration Status
-- **Planned Input Architecture**: 2 × PZT sensors $\rightarrow$ Analog Signal Conditioning $\rightarrow$ ESP32 ADC $\rightarrow$ Wi-Fi/MQTT $\rightarrow$ Aegis3D backend API.
-- **Current Status**: ESP32 PlatformIO firmware and PCB schematics are scaffolded in `firmware/` and `hardware/`. Physical PZT acquisition is not yet fully integrated into the backend pipeline.
-- **Backend Independence**: The signal processing, baseline, anomaly, correlation, trend, SHI, and REST API modules operate seamlessly on simulated, imported, or sampled signal data without physical hardware dependencies.
+The Structural Health Indicator (SHI) is a deterministic prototype score bounded strictly to `0–100`:
+$$\text{raw\_score} = 100.0 - (\text{anomaly\_penalty} + \text{persistence\_penalty} + \text{cross\_sensor\_penalty} + \text{trend\_penalty})$$
+$$\text{SHI} = \max(0, \min(100, \text{raw\_score}))$$
 
-### Frontend Dashboard & Digital Twin HUD Status
-- **Current Status**: Next.js 14 dashboard application shell implemented in `frontend/`, featuring a 2.5D MapLibre GL city map component (`CityMap.tsx`) rendering Delhi building footprint polygons (`delhi_buildings.json`) alongside an interactive 3D BIM Digital Twin modal (`DigitalTwinViewer.tsx`) and telemetry HUD components (`TelemetryHUD.tsx`, `ProcessingPipelineStrip.tsx`).
-- **Processing Pipeline Strip Layout Architecture (`ProcessingPipelineStrip.tsx`)**:
-  - **Evidence Visualization Role**: Displays the 7-stage backend signal processing verification pipeline (`01 INGESTION`, `02 CONDITIONING`, `03 EVENT DETECT`, `04 ANOMALY EVAL`, `05 CORRELATION`, `06 HEALTH (SHI)`, `07 SYSTEM ALERT`). *Architectural note*: The UI component acts strictly as a visual presentation layer rendering real backend processing telemetry (`TelemetryLatestResponse`); signal filtering, feature extraction, z-score anomaly scoring, and SHI formulas are executed entirely by the backend engine.
-  - **Deterministic 3-Column CSS Grid**: Each pipeline stage row enforces a 3-column layout (`gridTemplateColumns: "auto minmax(0, 1fr) auto"`):
-    1. **Left (Stage Identifier & Label)**: Stage index and stage name (`flexShrink: 0`, `whiteSpace: "nowrap"`).
-    2. **Middle (Flexible Evidence Description)**: Flexible evidence text container (`minmax(0, 1fr)`, `minWidth: 0`, `overflow: "hidden"`, `textOverflow: "ellipsis"`, `whiteSpace: "nowrap"`). Includes `title={stage.evidence}` tooltips for full evidence text preview on hover.
-    3. **Right (Status / Value Badge)**: Fixed/min-content status badge (`flexShrink: 0`, `whiteSpace: "nowrap"`).
-  - **Layout Constraints**: Long evidence strings truncate gracefully via CSS ellipsis without colliding with right-side status badges, preventing badge clipping, horizontal scrollbars, nested viewport scrollbars, or page-level scrollbars across screen resolutions (1920×1080, 1440×900, and modal viewports).
+### Penalty Breakdown
+- Individual Anomaly Activity: $-15.0$ pts
+- Temporal Persistence: $-20.0$ pts
+- Cross-Sensor Correlation: $-25.0$ pts
+- Increasing Trend Penalty: $-15.0$ pts
+
+### Prototype Health Status Mapping
+- $\text{SHI} \ge 90.0 \implies \text{HealthStatus.NORMAL}$
+- $70.0 \le \text{SHI} < 90.0 \implies \text{HealthStatus.MONITOR}$
+- $45.0 \le \text{SHI} < 70.0 \implies \text{HealthStatus.INSPECTION_ADVISED}$
+- $\text{SHI} < 45.0 \implies \text{HealthStatus.HIGH_PRIORITY_INSPECTION}$
+
+### Mandatory Safety Disclaimer
+Every health result payload and inspector view displays the canonical disclaimer:
+> *"SHI is a prototype evidence-based monitoring indicator derived from observed signal/event behavior. It is not a certified structural safety score and does not independently establish structural damage or failure."*
 
 ---
 
-## Backend Software Architecture & Directory Tree
+## BIM / Digital Twin & GIS Integration
 
-```text
-Aegis3D/
-├── docker-compose.yml           # PostgreSQL 15 & Mosquitto MQTT Docker containers
-├── .env.example                 # Environment configuration template
-├── README.md                    # Project technical documentation
-├── backend/
-│   ├── requirements.txt         # FastAPI, SQLAlchemy, SciPy, NumPy, Matplotlib
-│   ├── alembic.ini              # Alembic database migration config
-│   ├── app/
-│   │   ├── main.py              # FastAPI app initialization & router setup
-│   │   ├── api/                 # REST router registration
-│   │   │   └── routes/          # REST endpoints (health.py, telemetry.py, events.py, zones.py, alerts.py, monitoring.py)
-│   │   ├── db/                  # Session provider, Base engine, Alembic migrations
-│   │   ├── models/              # Zone, MonitoringSession, Event, Baseline, HealthSnapshot, Alert
-│   │   ├── schemas/             # Pydantic schemas (telemetry.py, event.py, zone.py, alert.py, health.py)
-│   │   ├── repositories/        # EventRepository, BaselineRepository
-│   │   ├── services/            # TelemetryService, EventService, BaselineService, AnomalyService, CorrelationService, TrendService, HealthService, MonitoringService
-│   │   ├── processing/          # Signal filtering, window detection & FFT feature extraction
-│   │   ├── baseline/            # Pure zone statistical baseline calculation engine
-│   │   ├── anomaly/             # Pure z-score anomaly detection engine
-│   │   ├── correlation/         # Temporal persistence, 2-PZT correlation & evidence aggregation
-│   │   ├── trend/               # Sub-period trend analysis calculation engine
-│   │   └── health/              # Pure Structural Health Indicator (SHI) calculation engine
-│   ├── scripts/
-│   │   └── demo_signal_processing.py  # Executable signal processing visual demo
-│   └── tests/                   # Complete backend pytest test suite (164 passed, 1 warning)
-│       ├── test_signal_processing.py
-│       ├── test_baseline.py
-│       ├── test_anomaly.py
-│       ├── test_correlation.py
-│       ├── test_trend.py
-│       ├── test_shi.py
-│       ├── test_api_telemetry.py # Telemetry ingestion contract & processing pipeline tests
-│       ├── test_api_events.py
-│       ├── test_api_health.py
-│       ├── test_api_monitoring.py
-│       ├── test_db_config.py
-│       └── test_models.py
-├── firmware/esp32/              # ESP32 PlatformIO firmware scaffolding
-├── frontend/                    # Next.js 14 frontend dashboard, 3D BIM Viewer & MapLibre GL GIS city map
-├── hardware/                    # PCB layout, BOM, schematics scaffolding
-├── docs/                        # Architecture diagrams and BIM_ARCHITECTURE.md
-└── data/                        # Signal and BIM data storage directories
-```
+- **IFC / GLB Model**: Offline spatial extraction parses IFC structural geometries into `building_metadata.json` and maps storeys/elements to GLB mesh node identifiers (`models/glb/building_demo.glb`).
+- **3D Building Viewer (`DigitalTwinViewer.tsx`)**: Built with Three.js and React Three Fiber. Applies dynamic status color overlays (`NORMAL`, `MONITOR`, `INSPECTION_ADVISED`, `HIGH_PRIORITY_INSPECTION`) to structural elements based on backend zone health endpoints.
+- **Logical Zones vs Spatial Groups**: Maps logical monitoring zones (`Zone 1 - Main Deck Girder`, `Zone 2 - Pier Column 4`) to BIM element groups. *Does not claim physical individual sensor micro-coordinates.*
+- **GIS City Map (`CityMap.tsx`)**: Next.js 14 MapLibre GL 2.5D city map component rendering building footprint polygons in Delhi (`delhi_buildings.json`).
+
+---
+
+## Virtual Sensor Simulator (`simulator/`)
+
+The repository includes an active virtual signal simulator emitting multi-sensor telemetry to `POST /api/v1/telemetry`:
+- **PZT Tone Burst Excitation (`generate_pzt_tone_burst`)**: Generates windowed sinusoidal tone-burst signals representing active PZT acoustic excitation.
+- **Physics-Inspired Propagation (`simulator/physics/`)**: Models attenuation and time delay across structural propagation paths between virtual sensors.
+- **Signal Modes**: Supports `normal`/`healthy`, `transient`/`event`, and `anomaly` signal payload generation.
 
 ---
 
@@ -415,6 +184,7 @@ Aegis3D/
 
 ### 1. Prerequisites
 - Python 3.10+
+- Node.js 18+ & npm
 - Docker & Docker Compose (for PostgreSQL database)
 - Git
 
@@ -430,7 +200,7 @@ cp .env.example .env
 docker compose up -d postgres
 ```
 
-### 4. Setup Virtual Environment & Install Dependencies
+### 4. Setup Backend Virtual Environment
 ```bash
 cd backend
 python -m venv .venv
@@ -442,82 +212,56 @@ python -m venv .venv
 # source .venv/bin/activate
 
 pip install -r requirements.txt
-```
-
-### 5. Run Database Migrations
-```bash
 alembic upgrade head
-```
-
-### 6. Start FastAPI Development Server
-```bash
 uvicorn app.main:app --reload
 ```
 
-Verify endpoints:
-- **API Liveness Check**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
-- **Database Readiness Check**: [http://127.0.0.1:8000/health/db](http://127.0.0.1:8000/health/db)
+### 5. Setup Frontend Application
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Endpoints:
+- **Backend API**: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- **API Health**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 - **Telemetry Ingestion**: `POST http://127.0.0.1:8000/api/v1/telemetry`
-- **List Zones**: [http://127.0.0.1:8000/api/v1/zones](http://127.0.0.1:8000/api/v1/zones)
-- **Health Summary**: [http://127.0.0.1:8000/api/v1/health/summary](http://127.0.0.1:8000/api/v1/health/summary)
-- **List Alerts**: [http://127.0.0.1:8000/api/v1/alerts](http://127.0.0.1:8000/api/v1/alerts)
+- **Processing Trace**: `GET http://127.0.0.1:8000/api/v1/telemetry/latest/processing-trace`
+- **Frontend Dashboard**: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
 
 ---
 
-## Running Verification Commands
+## Test Verification
 
-### 1. Run Complete Backend Test Suite
+### Backend Pytest Suite
 ```bash
 cd backend
-.\.venv\Scripts\python.exe -m pytest tests/
+.\.venv\Scripts\python.exe -m pytest
 ```
-*Expected Result*: **`164 passed, 1 warning`** across all test modules.
+*Verification Result*: **`173 passed, 1 warning`** across 16 test modules (`test_processing_trace.py`, `test_api_telemetry.py`, `test_signal_processing.py`, `test_shi.py`, `test_anomaly.py`, `test_correlation.py`, `test_trend.py`, `test_baseline.py`, `test_api_monitoring.py`, `test_api_events.py`, `test_api_health.py`, `test_models.py`, `test_db_config.py`, `test_api_cors.py`, `test_seed_demo.py`, `test_zone_bim_mapping.py`).
 
-### 2. Run Signal Processing Visual Demonstration
+### Frontend Type Check
 ```bash
-cd backend
-.\.venv\Scripts\python.exe scripts/demo_signal_processing.py
+cd frontend
+npx tsc --noEmit
 ```
-*Expected Result*: Executes full 5-stage signal processing pipeline on synthetic burst signals and generates visualization plot in `data/processed/step5_signal_demo.png`.
-
----
-
-## Validation Strategy
-
-### Testing Methodology
-Aegis3D validates algorithm behavior using synthetic, imported, and controlled signal datasets:
-- **Baseline Datasets**: Background structural mechanical noise without burst events.
-- **Environmental Noise Datasets**: Non-structural transient noise spikes (e.g. door closures, footsteps).
-- **Controlled Stress Event Datasets**: High-amplitude acoustic burst signals simulating mechanical stress wave releases.
-
-### Planned Physical Benchtop Metrics
-As physical hardware coupling progresses, Aegis3D will evaluate:
-- **Event Detection Latency**: Processing time from raw sample ingestion to backend anomaly & health result.
-- **False Positive Separation**: Statistical separation (`delta_z`) between normal baseline noise and true anomaly events.
-- **TDOA Arrival Accuracy**: Precision of relative arrival time lead/lag estimation between 2 PZT sensors.
+*Verification Result*: **`0 errors`**.
 
 ---
 
 ## Software-First Milestone Roadmap
 
-### Implemented Backend Capabilities (**Completed**)
-- [x] **Step 1**: Core domain models & schema design
-- [x] **Step 2**: PostgreSQL database persistence & Alembic migrations
-- [x] **Step 3**: FastAPI REST foundation & health endpoints
-- [x] **Step 4**: Event ingestion REST API (`POST /api/v1/events`)
-- [x] **Step 5**: Signal processing engine (DC offset, Butterworth filtering, windowing, FFT extraction)
-- [x] **Step 6**: Zone statistical baseline engine (mean, standard deviation, event rate)
-- [x] **Step 7**: Rule-based z-score anomaly detection engine (`|z| >= 3.0` sigma, zero-variance handling)
-- [x] **Step 8**: Temporal persistence evaluation, 2-PZT cross-sensor correlation & evidence aggregation
-- [x] **Step 9**: Deterministic zone trend analysis engine (`STABLE`, `INCREASING`, `DECREASING`, `INSUFFICIENT_DATA`)
-- [x] **Step 10**: Deterministic Structural Health Indicator (SHI 0–100 score, itemized deductions, `HealthSnapshot`)
-- [x] **Step 11**: Monitoring & Structural Health REST API integration endpoints (zones, health, trend, correlation, alerts, summary)
-- [x] **Backend Step 3A/3B**: Telemetry Ingestion Contract & Existing Processing Pipeline (`POST /api/v1/telemetry`)
+### Implemented Capabilities (**Completed**)
+- [x] **Backend Intelligence Engine**: Signal processing (Butterworth/FFT), statistical baseline, z-score anomaly detection, temporal persistence, 2-PZT cross-sensor correlation, directional trend, and SHI scoring.
+- [x] **Telemetry Ingestion API**: `POST /api/v1/telemetry` raw discrete signal processing pipeline.
+- [x] **Processing Trace API**: `GET /api/v1/telemetry/{identifier}/processing-trace` returning full 9-stage evidence trace payloads.
+- [x] **Frontend Telemetry Inspector**: 9-stage evidence viewer component (`TelemetryProcessingInspector.tsx`) with dynamic sliding-window fading stage pagination, tooltips, keyboard accessibility, reduced motion support, directional page slide transitions, and Page 9 first-viewport layout.
+- [x] **Virtual Sensor Simulator**: PZT tone burst excitation and structural propagation telemetry generator (`simulator/`).
+- [x] **3D Digital Twin & GIS Map**: R3F 3D building viewer (`DigitalTwinViewer.tsx`) with zone health highlighting and MapLibre GL GIS map (`CityMap.tsx`).
+- [x] **REST API Layer & Pytest Suite**: Complete monitoring REST endpoints and **173 passed / 1 warning** pytest suite.
 
-### Future Milestones (**Next Development Stages**)
-- [ ] **Virtual Sensor Simulator**: Stream representative telemetry signals to `POST /api/v1/telemetry` for end-to-end testing
-- [ ] **Frontend Live Telemetry Visualization**: Connect client dashboard cards to live telemetry ingestion results and streaming health status
-- [ ] **3D Digital Twin Dynamic Highlighting**: Interactive real-time component color transitions based on live health score updates in `BuildingViewer.tsx`
-- [ ] **ESP32 Firmware & ADC Sampling**: Firmware completion for physical PZT ADC sampling and benchtop testing
-- [ ] **MQTT Live Ingestion Adapter**: Broker integration for hardware stream forwarding to backend API
-- [ ] **Multi-level Alert Escalation**: Escalation workflows for persistent multi-zone anomalies
+### Future Milestones (**Upcoming Work**)
+- [ ] **Live Processing Stream**: Real-time WebSockets / SSE streaming layer connecting live background processing updates directly into the inspector UI.
+- [ ] **ESP32 Benchtop Hardware**: Full benchtop validation with physical ESP32 PZT sampling hardware.
+- [ ] **Multi-level Alert Escalation**: Escalation workflows for persistent multi-zone anomalies.
