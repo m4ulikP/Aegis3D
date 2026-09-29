@@ -168,7 +168,7 @@ The backend processing engine and authoritative trace assemble complete evidence
 | **03** | **Event Detection** | Evaluates conditioned amplitude against detection thresholds ($V_{\text{thresh}}$), identifies contiguous active activity windows, rejects transient noise below minimum sample count, and merges sub-threshold gaps. |
 | **04** | **Feature Extraction** | Computes quantitative event characteristics: Peak Amplitude $\max(\|x[n]\|)$, Root Mean Square (RMS), Discrete Signal Energy $\sum x[n]^2$, Active Duration (ms), and Dominant Frequency via real FFT (`np.fft.rfft`) excluding the DC bin. |
 | **05** | **Baseline Reference** | Compares extracted features against zone statistical norms derived from historical normal baseline records (arithmetic mean $\mu$ and population standard deviation $\sigma$ for magnitude and energy, plus baseline event rate). |
-| **06** | **Anomaly Evaluation** | Computes standardized z-scores for magnitude and energy: <br>$$z = \frac{x - \mu}{\sigma}$$<br> Flags events exceeding threshold ($$\|z\| \ge 3.0$$) with zero-variance baseline protection. |
+| **06** | **Anomaly Evaluation** | Computes standardized z-scores for magnitude and energy: <br>$$z = \frac{x - \mu}{\sigma}$$<br> Flags events exceeding threshold ($\|z\| \ge 3.0$) with zero-variance baseline protection. |
 | **07** | **Persistence** | Analyzes rolling anomaly ratios across an observation window (default 300s): tracks total events, anomalous events, anomaly ratio, and maximum consecutive anomalies to filter isolated false positives. |
 | **08** | **Cross-Sensor Correlation** | Correlates events across two distinct PZT sensors within temporal tolerance (default 25 ms), computing Time-Difference-of-Arrival (TDOA) spread ($\Delta t = \|t_2 - t_1\|$) and relative lead/lag arrival order along the sensor pair. |
 | **09** | **Health & Alert** | Calculates the prototype Structural Health Indicator (SHI 0–100 score), itemized score deduction penalties, health classification (`NORMAL`, `MONITOR`, `INSPECTION_ADVISED`, `HIGH_PRIORITY_INSPECTION`), directional trend, and active alert dispatch. |
@@ -199,10 +199,10 @@ $$\text{SHI} = \max(0.0, \min(100.0, \text{raw\_score}))$$
 - **Increasing Trend Penalty**: $-15.0$ pts (triggered when linear regression slope indicates accelerating degradation)
 
 ### Health Status Classification
-- $\text{SHI} \ge 90.0 \implies \text{HealthStatus.NORMAL}$
-- $70.0 \le \text{SHI} < 90.0 \implies \text{HealthStatus.MONITOR}$
-- $45.0 \le \text{SHI} < 70.0 \implies \text{HealthStatus.INSPECTION_ADVISED}$
-- $\text{SHI} < 45.0 \implies \text{HealthStatus.HIGH_PRIORITY_INSPECTION}$
+- $\text{SHI} \ge 90.0 \implies$ `HealthStatus.NORMAL`
+- $70.0 \le \text{SHI} < 90.0 \implies$ `HealthStatus.MONITOR`
+- $45.0 \le \text{SHI} < 70.0 \implies$ `HealthStatus.INSPECTION_ADVISED`
+- $\text{SHI} < 45.0 \implies$ `HealthStatus.HIGH_PRIORITY_INSPECTION`
 
 ---
 
