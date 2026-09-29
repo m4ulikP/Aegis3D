@@ -90,15 +90,17 @@ def run_single_sensor_loop(
     batches: int,
     interval_seconds: float,
     seed: Optional[int] = None,
+    use_physics: bool = False,
 ) -> None:
     """Execute telemetry generation loop for a single virtual sensor."""
     batch_idx = 0
     consecutive_errors = 0
 
     print(f"\nStarting Telemetry Stream:")
-    print(f"  Target: {client.full_url}")
-    print(f"  Sensor: {sensor.sensor_id} ({sensor.zone_name})")
-    print(f"  Mode:   {mode.upper()} | Batches: {batches if batches > 0 else 'Continuous'} | Interval: {interval_seconds}s")
+    print(f"  Target:  {client.full_url}")
+    print(f"  Sensor:  {sensor.sensor_id} ({sensor.zone_name})")
+    print(f"  Physics: {'ACTIVE (Guided-Wave Propagation)' if (use_physics or mode.startswith('physics-')) else 'STANDARD (Representative Synthesis)'}")
+    print(f"  Mode:    {mode.upper()} | Batches: {batches if batches > 0 else 'Continuous'} | Interval: {interval_seconds}s")
     print("-" * 72)
 
     try:
@@ -107,11 +109,22 @@ def run_single_sensor_loop(
             batch_seed = (seed + batch_idx) if seed is not None else None
 
             # Generate payload (pure telemetry samples, zero forced backend decisions)
-            payload = sensor.generate_payload(
-                mode=mode,
-                sample_count=sample_count,
-                seed=batch_seed,
-            )
+            if use_physics or mode.startswith("physics-"):
+                physics_mode = "anomaly" if ("anomaly" in mode or "damaged" in mode) else "normal"
+                actual_samples = sample_count if sample_count >= 5000 else 10000
+                actual_rate = sensor.sample_rate_hz if sensor.sample_rate_hz >= 10000.0 else 100000.0
+                payload = sensor.generate_physics_payload(
+                    mode=physics_mode,
+                    sample_count=actual_samples,
+                    sample_rate_hz=actual_rate,
+                    seed=batch_seed,
+                )
+            else:
+                payload = sensor.generate_payload(
+                    mode=mode,
+                    sample_count=sample_count,
+                    seed=batch_seed,
+                )
 
             # Compute local simulation peak for debug display
             sim_peak = max(abs(x) for x in payload["samples"]) if payload["samples"] else 0.0
@@ -249,9 +262,14 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--mode",
-        choices=["normal", "transient", "anomaly", "correlation"],
+        choices=["normal", "transient", "anomaly", "correlation", "physics-normal", "physics-anomaly"],
         default="normal",
         help="Telemetry simulation mode (default: normal)",
+    )
+    parser.add_argument(
+        "--physics",
+        action="store_true",
+        help="Enable reduced-order BIM guided-wave propagation physics simulation (Hann tone burst, path delay, attenuation, damage scattering)",
     )
     parser.add_argument(
         "--sensor",
@@ -348,6 +366,7 @@ def main() -> int:
             batches=args.batches,
             interval_seconds=args.interval,
             seed=args.seed,
+            use_physics=args.physics,
         )
 
     print("\n[INFO] Simulation session finished.")

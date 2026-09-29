@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import {
     AlertResponse,
@@ -224,6 +225,24 @@ export default function TelemetryHUD({
                         >
                             {isLiveConnected ? "LIVE 1.5s" : "DISCONNECTED"}
                         </span>
+                        <Link
+                            href="/simulator"
+                            style={{
+                                fontSize: 9,
+                                fontWeight: 700,
+                                fontFamily: theme.typography.fontMono,
+                                padding: "1px 6px",
+                                borderRadius: 4,
+                                background: "rgba(56, 189, 248, 0.15)",
+                                color: "#38bdf8",
+                                border: "1px solid rgba(56, 189, 248, 0.35)",
+                                textDecoration: "none",
+                                cursor: "pointer",
+                            }}
+                            title="Open Virtual PZT Simulator Console"
+                        >
+                            SIMULATOR ↗
+                        </Link>
                     </div>
                     <div
                         style={{

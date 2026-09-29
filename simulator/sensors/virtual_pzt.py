@@ -22,6 +22,7 @@ try:
         ZONE_MAIN_DECK,
     )
     from simulator.physics import (
+        DamageModel,
         PropagationPath,
         ReceiverAcquisition,
     )
@@ -37,6 +38,7 @@ except ImportError:
         ZONE_MAIN_DECK,
     )
     from physics import (
+        DamageModel,
         PropagationPath,
         ReceiverAcquisition,
     )
@@ -121,6 +123,7 @@ class VirtualPZTSensor:
         sample_count: int = 10000,
         sample_rate_hz: float = 100000.0,
         seed: Optional[int] = 42,
+        damage_effect: Optional[object] = None,
     ) -> List[float]:
         """
         Generate a PZT tone-burst excitation and propagate it through
@@ -133,22 +136,14 @@ class VirtualPZTSensor:
             2. Structural propagation
             3. Propagation delay
             4. Distance-dependent attenuation
-            5. Receiver/acquisition scaling
+            5. Discontinuity scattering (if damage active)
+            6. Receiver/acquisition scaling
 
         This is a physics-inspired simulation, not an experimentally
         calibrated structural model.
         """
 
         # Generate the actuator excitation.
-        #
-        # The current internal physics simulation uses:
-        #   - 100 kHz sampling
-        #   - 10 kHz carrier
-        #   - 5-cycle tone burst
-        #   - amplitude = 0.8
-        #
-        # This is intentionally separate from the existing 1 kHz
-        # backend telemetry generator.
         source_signal = generate_pzt_tone_burst(
             sample_count=sample_count,
             sample_rate_hz=sample_rate_hz,
@@ -161,6 +156,7 @@ class VirtualPZTSensor:
         propagated_signal = path.propagate(
             source_signal,
             sample_rate_hz=sample_rate_hz,
+            damage_effect=damage_effect,
         )
 
         # Model the receiving/acquisition stage after structural
@@ -255,6 +251,107 @@ class VirtualPZTSensor:
         effective_threshold = detection_threshold if detection_threshold is not None else threshold
         if effective_threshold is not None:
             payload["detection_threshold"] = float(effective_threshold)
+
+        if session_id is not None:
+            payload["session_id"] = session_id
+
+        return payload
+
+    def generate_physics_payload(
+        self,
+        mode: str = "normal",
+        path: Optional[PropagationPath] = None,
+        damaged_component_guid: Optional[str] = None,
+        sample_count: int = 10000,
+        sample_rate_hz: float = 100000.0,
+        seed: Optional[int] = 42,
+        session_id: Optional[Any] = None,
+        timestamp: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate a physics-driven telemetry payload using a BIM propagation path.
+
+        Applies:
+        - Hann-windowed PZT tone burst excitation
+        - Structural propagation delay and distance attenuation
+        - Discontinuity/damage interaction & localized scattering (if mode == 'anomaly')
+        - Receiver/acquisition scaling
+        """
+        import json
+        from pathlib import Path
+
+        mode = mode.lower().strip()
+        damage_effect = None
+
+        if path is None:
+            # Locate default path from propagation network
+            network_file = Path(__file__).resolve().parents[2] / "data" / "processed" / "bim" / "propagation_network.json"
+            if network_file.exists():
+                with open(network_file, "r", encoding="utf-8") as f:
+                    net_data = json.load(f)
+                matched_raw = None
+                for p in net_data.get("paths", []):
+                    if p["path_id"] == "PATH-007" and (self.sensor_id in [p["actuator_id"], p["receiver_id"], "PZT-Z01"]):
+                        matched_raw = p
+                        break
+                if matched_raw is None:
+                    for p in net_data.get("paths", []):
+                        if p["actuator_id"] == self.sensor_id or p["receiver_id"] == self.sensor_id:
+                            matched_raw = p
+                            break
+                if matched_raw is None and net_data.get("paths"):
+                    matched_raw = net_data["paths"][0]
+
+                if matched_raw:
+                    path = PropagationPath(
+                        actuator_id=matched_raw["actuator_id"],
+                        receiver_id=matched_raw["receiver_id"],
+                        component_guids=tuple(matched_raw["component_guids"]),
+                        distance_m=float(matched_raw["distance_m"]),
+                        wave_velocity_m_s=float(matched_raw["wave_velocity_m_s"]),
+                        attenuation_db_per_m=float(matched_raw["attenuation_db_per_m"]),
+                    )
+                    influences = matched_raw.get("component_influences", [])
+                    if mode in {"anomaly", "damaged"}:
+                        dm = DamageModel()
+                        dm.set_damaged_component(damaged_component_guid or "1WrzGm1SD2ev45B_OWQ3El")
+                        damage_effect = dm.get_path_effect(influences, sample_rate_hz=sample_rate_hz)
+
+        if path is None:
+            # Fallback path if network json not found
+            path = PropagationPath(
+                actuator_id="PZT-Z04",
+                receiver_id=self.sensor_id,
+                component_guids=("fallback_guid",),
+                distance_m=16.30,
+                wave_velocity_m_s=3200.0,
+                attenuation_db_per_m=0.8,
+            )
+
+        signal_samples = self.generate_propagated_signal(
+            path=path,
+            sample_count=sample_count,
+            sample_rate_hz=sample_rate_hz,
+            seed=seed,
+            damage_effect=damage_effect,
+        )
+
+        if timestamp is not None:
+            if isinstance(timestamp, datetime):
+                ts_str = timestamp.isoformat()
+            else:
+                ts_str = str(timestamp)
+        else:
+            ts_str = datetime.now(timezone.utc).isoformat()
+
+        payload: Dict[str, Any] = {
+            "sensor_id": self.sensor_id,
+            "zone_name": self.zone_name,
+            "sample_rate_hz": sample_rate_hz,
+            "samples": signal_samples,
+            "timestamp": ts_str,
+            "sequence": self._next_sequence(),
+        }
 
         if session_id is not None:
             payload["session_id"] = session_id

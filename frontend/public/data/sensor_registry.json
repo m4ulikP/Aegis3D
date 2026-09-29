@@ -1,0 +1,200 @@
+{
+  "version": 1,
+  "description": "Fixed virtual PZT sensor registry generated from the IFC structural model.",
+  "source": "data/raw/bim/sample_structural.ifc \u2192 data/processed/bim/structural_geometry.json",
+  "sensor_count": 12,
+  "sensors": [
+    {
+      "sensor_id": "PZT-Z01",
+      "component_guid": "2Ci2k7uxXCqAqqsxOmESOv",
+      "component_type": "IfcColumn",
+      "component_name": "UC-Universal Columns-Column:UC356x368x129:123067",
+      "storey": "01 - Entry Level",
+      "zone_id": 2,
+      "zone_name": "Zone 2 - Substructure Pier B",
+      "position": [
+        -6.199999999999909,
+        29.46399999999972,
+        1.800000000000579
+      ],
+      "role": "receiver",
+      "status": "NORMAL"
+    },
+    {
+      "sensor_id": "PZT-Z02",
+      "component_guid": "18YHwga450Mw4Fy6M5t_8F",
+      "component_type": "IfcColumn",
+      "component_name": "M_Concrete-Round-Column:450mm:122548",
+      "storey": "01 - Entry Level",
+      "zone_id": 2,
+      "zone_name": "Zone 2 - Substructure Pier B",
+      "position": [
+        54.66080000000012,
+        -1.6697754290362354e-13,
+        1.7500000000005789
+      ],
+      "role": "receiver",
+      "status": "NORMAL"
+    },
+    {
+      "sensor_id": "PZT-Z03",
+      "component_guid": "18YHwga450Mw4Fy6M5t_8d",
+      "component_type": "IfcColumn",
+      "component_name": "M_Concrete-Round-Column:450mm:122524",
+      "storey": "01 - Entry Level",
+      "zone_id": 2,
+      "zone_name": "Zone 2 - Substructure Pier B",
+      "position": [
+        28.65120000000019,
+        52.62879999999954,
+        1.7500000000005789
+      ],
+      "role": "receiver",
+      "status": "NORMAL"
+    },
+    {
+      "sensor_id": "PZT-Z04",
+      "component_guid": "18YHwga450Mw4Fy6M5t_8h",
+      "component_type": "IfcColumn",
+      "component_name": "M_Concrete-Round-Column:450mm:122512",
+      "storey": "01 - Entry Level",
+      "zone_id": 2,
+      "zone_name": "Zone 2 - Substructure Pier B",
+      "position": [
+        15.849600000000201,
+        -3.907985046680551e-14,
+        1.7500000000005789
+      ],
+      "role": "receiver",
+      "status": "NORMAL"
+    },
+    {
+      "sensor_id": "PZT-Z05",
+      "component_guid": "2UD3D7uxP8kecbbBCRtzBI",
+      "component_type": "IfcColumn",
+      "component_name": "M_Concrete-Round-Column:450mm:151636",
+      "storey": "02 - Floor",
+      "zone_id": 1,
+      "zone_name": "Zone 1 - Main Deck Girder",
+      "position": [
+        -1.7763568394002505e-15,
+        0.0,
+        5.55000000000055
+      ],
+      "role": "receiver",
+      "status": "NORMAL"
+    },
+    {
+      "sensor_id": "PZT-Z06",
+      "component_guid": "2UD3D7uxP8kecbbBCRtzBt",
+      "component_type": "IfcColumn",
+      "component_name": "M_Concrete-Round-Column:450mm:151665",
+      "storey": "02 - Floor",
+      "zone_id": 1,
+      "zone_name": "Zone 1 - Main Deck Girder",
+      "position": [
+        28.65120000000019,
+        52.62879999999954,
+        5.55000000000055
+      ],
+      "role": "receiver",
+      "status": "NORMAL"
+    },
+    {
+      "sensor_id": "PZT-Z07",
+      "component_guid": "2UD3D7uxP8kecbbBCRtzBw",
+      "component_type": "IfcColumn",
+      "component_name": "M_Concrete-Round-Column:450mm:151676",
+      "storey": "02 - Floor",
+      "zone_id": 1,
+      "zone_name": "Zone 1 - Main Deck Girder",
+      "position": [
+        54.66080000000012,
+        -1.6697754290362354e-13,
+        5.55000000000055
+      ],
+      "role": "receiver",
+      "status": "NORMAL"
+    },
+    {
+      "sensor_id": "PZT-Z08",
+      "component_guid": "2UD3D7uxP8kecbbBCRtzB8",
+      "component_type": "IfcColumn",
+      "component_name": "M_Concrete-Round-Column:450mm:151630",
+      "storey": "02 - Floor",
+      "zone_id": 1,
+      "zone_name": "Zone 1 - Main Deck Girder",
+      "position": [
+        5.684341886080802e-14,
+        35.76319999999971,
+        5.55000000000055
+      ],
+      "role": "receiver",
+      "status": "NORMAL"
+    },
+    {
+      "sensor_id": "PZT-Z09",
+      "component_guid": "2UD3D7uxP8kecbbBCRtzCE",
+      "component_type": "IfcColumn",
+      "component_name": "M_Concrete-Round-Column:450mm:151944",
+      "storey": "03 - Floor",
+      "zone_id": null,
+      "zone_name": null,
+      "position": [
+        -1.7763568394002505e-15,
+        0.0,
+        9.3
+      ],
+      "role": "receiver",
+      "status": "NORMAL"
+    },
+    {
+      "sensor_id": "PZT-Z10",
+      "component_guid": "2UD3D7uxP8kecbbBCRtzCZ",
+      "component_type": "IfcColumn",
+      "component_name": "M_Concrete-Round-Column:450mm:151973",
+      "storey": "03 - Floor",
+      "zone_id": null,
+      "zone_name": null,
+      "position": [
+        28.65120000000019,
+        52.62879999999954,
+        9.3
+      ],
+      "role": "receiver",
+      "status": "NORMAL"
+    },
+    {
+      "sensor_id": "PZT-Z11",
+      "component_guid": "2UD3D7uxP8kecbbBCRtzCs",
+      "component_type": "IfcColumn",
+      "component_name": "M_Concrete-Round-Column:450mm:151984",
+      "storey": "03 - Floor",
+      "zone_id": null,
+      "zone_name": null,
+      "position": [
+        54.66080000000012,
+        -1.6697754290362354e-13,
+        9.3
+      ],
+      "role": "receiver",
+      "status": "NORMAL"
+    },
+    {
+      "sensor_id": "PZT-Z12",
+      "component_guid": "2UD3D7uxP8kecbbBCRtzC4",
+      "component_type": "IfcColumn",
+      "component_name": "M_Concrete-Round-Column:450mm:151938",
+      "storey": "03 - Floor",
+      "zone_id": null,
+      "zone_name": null,
+      "position": [
+        5.684341886080802e-14,
+        35.76319999999971,
+        9.3
+      ],
+      "role": "receiver",
+      "status": "NORMAL"
+    }
+  ]
+}

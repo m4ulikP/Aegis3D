@@ -1,0 +1,520 @@
+{
+  "version": 1,
+  "description": "Fixed reduced-order structural propagation network derived from IFC world-space geometry. This is a simulation abstraction and does not represent explicit IFC connectivity.",
+  "source": {
+    "sensor_registry": "data\\processed\\bim\\sensor_registry.json",
+    "structural_geometry": "data\\processed\\bim\\structural_geometry.json"
+  },
+  "model": {
+    "wave_velocity_m_s": 3200.0,
+    "attenuation_db_per_m": 0.8,
+    "neighbors_per_sensor": 2
+  },
+  "sensor_count": 12,
+  "component_count": 873,
+  "path_count": 12,
+  "paths": [
+    {
+      "path_id": "PATH-001",
+      "actuator_id": "PZT-Z01",
+      "receiver_id": "PZT-Z08",
+      "component_guids": [
+        "2Ci2k7uxXCqAqqsxOmESOv",
+        "2Ci2k7uxXCqAqqsxOmESO_",
+        "2KAei9id52lOmXjM$MzgAY",
+        "17qC4eX$v65AOIXuxtQbmR",
+        "17qC4eX$v65AOIXuxtQbmP",
+        "2UD3D7uxP8kecbbBCRtzB8"
+      ],
+      "distance_m": 9.601168,
+      "wave_velocity_m_s": 3200.0,
+      "attenuation_db_per_m": 0.8,
+      "route_metadata": {
+        "derivation": "geometry_corridor",
+        "corridor_tolerance_m": 1.5,
+        "intermediate_component_count": 4,
+        "note": "Intermediate components are selected from IFC world-space geometry near the reduced-order propagation corridor. They do not represent explicit IFC connectivity relationships."
+      },
+      "component_influences": [
+        {
+          "ifc_guid": "2Ci2k7uxXCqAqqsxOmESOv",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.0,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "2Ci2k7uxXCqAqqsxOmESO_",
+          "distance_to_path_m": 1.373527,
+          "path_position": 0.124368,
+          "influence_factor": 0.084315
+        },
+        {
+          "ifc_guid": "2KAei9id52lOmXjM$MzgAY",
+          "distance_to_path_m": 1.498848,
+          "path_position": 0.133305,
+          "influence_factor": 0.000768
+        },
+        {
+          "ifc_guid": "17qC4eX$v65AOIXuxtQbmR",
+          "distance_to_path_m": 0.506081,
+          "path_position": 0.34593,
+          "influence_factor": 0.662613
+        },
+        {
+          "ifc_guid": "17qC4eX$v65AOIXuxtQbmP",
+          "distance_to_path_m": 0.467559,
+          "path_position": 0.50753,
+          "influence_factor": 0.688294
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzB8",
+          "distance_to_path_m": 0.0,
+          "path_position": 1.0,
+          "influence_factor": 1.0
+        }
+      ]
+    },
+    {
+      "path_id": "PATH-002",
+      "actuator_id": "PZT-Z01",
+      "receiver_id": "PZT-Z12",
+      "component_guids": [
+        "2Ci2k7uxXCqAqqsxOmESOv",
+        "2KAei9id52lOmXjM$MzgAY",
+        "17qC4eX$v65AOIXuxtQbmR",
+        "2UD3D7uxP8kecbbBCRtzC4"
+      ],
+      "distance_m": 11.591804,
+      "wave_velocity_m_s": 3200.0,
+      "attenuation_db_per_m": 0.8,
+      "route_metadata": {
+        "derivation": "geometry_corridor",
+        "corridor_tolerance_m": 1.5,
+        "intermediate_component_count": 2,
+        "note": "Intermediate components are selected from IFC world-space geometry near the reduced-order propagation corridor. They do not represent explicit IFC connectivity relationships."
+      },
+      "component_influences": [
+        {
+          "ifc_guid": "2Ci2k7uxXCqAqqsxOmESOv",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.0,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "2KAei9id52lOmXjM$MzgAY",
+          "distance_to_path_m": 1.114374,
+          "path_position": 0.140244,
+          "influence_factor": 0.257084
+        },
+        {
+          "ifc_guid": "17qC4eX$v65AOIXuxtQbmR",
+          "distance_to_path_m": 0.737463,
+          "path_position": 0.282762,
+          "influence_factor": 0.508358
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzC4",
+          "distance_to_path_m": 0.0,
+          "path_position": 1.0,
+          "influence_factor": 1.0
+        }
+      ]
+    },
+    {
+      "path_id": "PATH-003",
+      "actuator_id": "PZT-Z02",
+      "receiver_id": "PZT-Z07",
+      "component_guids": [
+        "18YHwga450Mw4Fy6M5t_8F",
+        "2UD3D7uxP8kecbbBCRtzBw"
+      ],
+      "distance_m": 3.8,
+      "wave_velocity_m_s": 3200.0,
+      "attenuation_db_per_m": 0.8,
+      "route_metadata": {
+        "derivation": "geometry_corridor",
+        "corridor_tolerance_m": 1.5,
+        "intermediate_component_count": 0,
+        "note": "Intermediate components are selected from IFC world-space geometry near the reduced-order propagation corridor. They do not represent explicit IFC connectivity relationships."
+      },
+      "component_influences": [
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8F",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.0,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzBw",
+          "distance_to_path_m": 0.0,
+          "path_position": 1.0,
+          "influence_factor": 1.0
+        }
+      ]
+    },
+    {
+      "path_id": "PATH-004",
+      "actuator_id": "PZT-Z02",
+      "receiver_id": "PZT-Z11",
+      "component_guids": [
+        "18YHwga450Mw4Fy6M5t_8F",
+        "2UD3D7uxP8kecbbBCRtzBw",
+        "2UD3D7uxP8kecbbBCRtzCs"
+      ],
+      "distance_m": 7.55,
+      "wave_velocity_m_s": 3200.0,
+      "attenuation_db_per_m": 0.8,
+      "route_metadata": {
+        "derivation": "geometry_corridor",
+        "corridor_tolerance_m": 1.5,
+        "intermediate_component_count": 1,
+        "note": "Intermediate components are selected from IFC world-space geometry near the reduced-order propagation corridor. They do not represent explicit IFC connectivity relationships."
+      },
+      "component_influences": [
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8F",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.0,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzBw",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.503311,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzCs",
+          "distance_to_path_m": 0.0,
+          "path_position": 1.0,
+          "influence_factor": 1.0
+        }
+      ]
+    },
+    {
+      "path_id": "PATH-005",
+      "actuator_id": "PZT-Z03",
+      "receiver_id": "PZT-Z06",
+      "component_guids": [
+        "18YHwga450Mw4Fy6M5t_8d",
+        "2UD3D7uxP8kecbbBCRtzBt"
+      ],
+      "distance_m": 3.8,
+      "wave_velocity_m_s": 3200.0,
+      "attenuation_db_per_m": 0.8,
+      "route_metadata": {
+        "derivation": "geometry_corridor",
+        "corridor_tolerance_m": 1.5,
+        "intermediate_component_count": 0,
+        "note": "Intermediate components are selected from IFC world-space geometry near the reduced-order propagation corridor. They do not represent explicit IFC connectivity relationships."
+      },
+      "component_influences": [
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8d",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.0,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzBt",
+          "distance_to_path_m": 0.0,
+          "path_position": 1.0,
+          "influence_factor": 1.0
+        }
+      ]
+    },
+    {
+      "path_id": "PATH-006",
+      "actuator_id": "PZT-Z03",
+      "receiver_id": "PZT-Z10",
+      "component_guids": [
+        "18YHwga450Mw4Fy6M5t_8d",
+        "2UD3D7uxP8kecbbBCRtzBt",
+        "2UD3D7uxP8kecbbBCRtzCZ"
+      ],
+      "distance_m": 7.55,
+      "wave_velocity_m_s": 3200.0,
+      "attenuation_db_per_m": 0.8,
+      "route_metadata": {
+        "derivation": "geometry_corridor",
+        "corridor_tolerance_m": 1.5,
+        "intermediate_component_count": 1,
+        "note": "Intermediate components are selected from IFC world-space geometry near the reduced-order propagation corridor. They do not represent explicit IFC connectivity relationships."
+      },
+      "component_influences": [
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8d",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.0,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzBt",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.503311,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzCZ",
+          "distance_to_path_m": 0.0,
+          "path_position": 1.0,
+          "influence_factor": 1.0
+        }
+      ]
+    },
+    {
+      "path_id": "PATH-007",
+      "actuator_id": "PZT-Z04",
+      "receiver_id": "PZT-Z05",
+      "component_guids": [
+        "18YHwga450Mw4Fy6M5t_8h",
+        "1WrzGm1SD2ev45B_OWQ3El",
+        "01U2Ox69TF78CjGAzXHDlb",
+        "1WrzGm1SD2ev45B_OWQ3Eg",
+        "2UD3D7uxP8kecbbBCRtzBI"
+      ],
+      "distance_m": 16.298767,
+      "wave_velocity_m_s": 3200.0,
+      "attenuation_db_per_m": 0.8,
+      "route_metadata": {
+        "derivation": "geometry_corridor",
+        "corridor_tolerance_m": 1.5,
+        "intermediate_component_count": 3,
+        "note": "Intermediate components are selected from IFC world-space geometry near the reduced-order propagation corridor. They do not represent explicit IFC connectivity relationships."
+      },
+      "component_influences": [
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8h",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.0,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3El",
+          "distance_to_path_m": 0.486736,
+          "path_position": 0.270178,
+          "influence_factor": 0.67551
+        },
+        {
+          "ifc_guid": "01U2Ox69TF78CjGAzXHDlb",
+          "distance_to_path_m": 1.373885,
+          "path_position": 0.351585,
+          "influence_factor": 0.084076
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3Eg",
+          "distance_to_path_m": 1.406815,
+          "path_position": 0.754749,
+          "influence_factor": 0.062123
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzBI",
+          "distance_to_path_m": 0.0,
+          "path_position": 1.0,
+          "influence_factor": 1.0
+        }
+      ]
+    },
+    {
+      "path_id": "PATH-008",
+      "actuator_id": "PZT-Z04",
+      "receiver_id": "PZT-Z09",
+      "component_guids": [
+        "18YHwga450Mw4Fy6M5t_8h",
+        "1WrzGm1SD2ev45B_OWQ3El",
+        "2UD3D7uxP8kecbbBCRtzEv",
+        "2UD3D7uxP8kecbbBCRtz80",
+        "2UD3D7uxP8kecbbBCRtz9O",
+        "2UD3D7uxP8kecbbBCRtzCE"
+      ],
+      "distance_m": 17.555977,
+      "wave_velocity_m_s": 3200.0,
+      "attenuation_db_per_m": 0.8,
+      "route_metadata": {
+        "derivation": "geometry_corridor",
+        "corridor_tolerance_m": 1.5,
+        "intermediate_component_count": 4,
+        "note": "Intermediate components are selected from IFC world-space geometry near the reduced-order propagation corridor. They do not represent explicit IFC connectivity relationships."
+      },
+      "component_influences": [
+        {
+          "ifc_guid": "18YHwga450Mw4Fy6M5t_8h",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.0,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "1WrzGm1SD2ev45B_OWQ3El",
+          "distance_to_path_m": 0.438573,
+          "path_position": 0.251119,
+          "influence_factor": 0.707618
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzEv",
+          "distance_to_path_m": 0.896438,
+          "path_position": 0.396118,
+          "influence_factor": 0.402375
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtz80",
+          "distance_to_path_m": 0.23959,
+          "path_position": 0.531961,
+          "influence_factor": 0.840273
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtz9O",
+          "distance_to_path_m": 0.50069,
+          "path_position": 0.761858,
+          "influence_factor": 0.666207
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzCE",
+          "distance_to_path_m": 0.0,
+          "path_position": 1.0,
+          "influence_factor": 1.0
+        }
+      ]
+    },
+    {
+      "path_id": "PATH-009",
+      "actuator_id": "PZT-Z05",
+      "receiver_id": "PZT-Z09",
+      "component_guids": [
+        "2UD3D7uxP8kecbbBCRtzBI",
+        "2UD3D7uxP8kecbbBCRtzCE"
+      ],
+      "distance_m": 3.75,
+      "wave_velocity_m_s": 3200.0,
+      "attenuation_db_per_m": 0.8,
+      "route_metadata": {
+        "derivation": "geometry_corridor",
+        "corridor_tolerance_m": 1.5,
+        "intermediate_component_count": 0,
+        "note": "Intermediate components are selected from IFC world-space geometry near the reduced-order propagation corridor. They do not represent explicit IFC connectivity relationships."
+      },
+      "component_influences": [
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzBI",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.0,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzCE",
+          "distance_to_path_m": 0.0,
+          "path_position": 1.0,
+          "influence_factor": 1.0
+        }
+      ]
+    },
+    {
+      "path_id": "PATH-010",
+      "actuator_id": "PZT-Z06",
+      "receiver_id": "PZT-Z10",
+      "component_guids": [
+        "2UD3D7uxP8kecbbBCRtzBt",
+        "2UD3D7uxP8kecbbBCRtzCZ"
+      ],
+      "distance_m": 3.75,
+      "wave_velocity_m_s": 3200.0,
+      "attenuation_db_per_m": 0.8,
+      "route_metadata": {
+        "derivation": "geometry_corridor",
+        "corridor_tolerance_m": 1.5,
+        "intermediate_component_count": 0,
+        "note": "Intermediate components are selected from IFC world-space geometry near the reduced-order propagation corridor. They do not represent explicit IFC connectivity relationships."
+      },
+      "component_influences": [
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzBt",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.0,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzCZ",
+          "distance_to_path_m": 0.0,
+          "path_position": 1.0,
+          "influence_factor": 1.0
+        }
+      ]
+    },
+    {
+      "path_id": "PATH-011",
+      "actuator_id": "PZT-Z07",
+      "receiver_id": "PZT-Z11",
+      "component_guids": [
+        "2UD3D7uxP8kecbbBCRtzBw",
+        "2UD3D7uxP8kecbbBCRtzCs"
+      ],
+      "distance_m": 3.75,
+      "wave_velocity_m_s": 3200.0,
+      "attenuation_db_per_m": 0.8,
+      "route_metadata": {
+        "derivation": "geometry_corridor",
+        "corridor_tolerance_m": 1.5,
+        "intermediate_component_count": 0,
+        "note": "Intermediate components are selected from IFC world-space geometry near the reduced-order propagation corridor. They do not represent explicit IFC connectivity relationships."
+      },
+      "component_influences": [
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzBw",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.0,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzCs",
+          "distance_to_path_m": 0.0,
+          "path_position": 1.0,
+          "influence_factor": 1.0
+        }
+      ]
+    },
+    {
+      "path_id": "PATH-012",
+      "actuator_id": "PZT-Z08",
+      "receiver_id": "PZT-Z12",
+      "component_guids": [
+        "2UD3D7uxP8kecbbBCRtzB8",
+        "2UD3D7uxP8kecbbBCRtzC4"
+      ],
+      "distance_m": 3.75,
+      "wave_velocity_m_s": 3200.0,
+      "attenuation_db_per_m": 0.8,
+      "route_metadata": {
+        "derivation": "geometry_corridor",
+        "corridor_tolerance_m": 1.5,
+        "intermediate_component_count": 0,
+        "note": "Intermediate components are selected from IFC world-space geometry near the reduced-order propagation corridor. They do not represent explicit IFC connectivity relationships."
+      },
+      "component_influences": [
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzB8",
+          "distance_to_path_m": 0.0,
+          "path_position": 0.0,
+          "influence_factor": 1.0
+        },
+        {
+          "ifc_guid": "2UD3D7uxP8kecbbBCRtzC4",
+          "distance_to_path_m": 0.0,
+          "path_position": 1.0,
+          "influence_factor": 1.0
+        }
+      ]
+    }
+  ],
+  "route_model": {
+    "type": "geometry_derived_reduced_order_network",
+    "corridor_tolerance_m": 1.5,
+    "intermediate_components": "IFC components whose world-space centers fall within the propagation corridor",
+    "connectivity_claim": "No explicit IFC connectivity is inferred."
+  },
+  "influence_model": {
+    "type": "distance_based_corridor_influence",
+    "radius_m": 1.5,
+    "maximum_influence": 1.0,
+    "minimum_influence": 0.0,
+    "note": "Influence factor is an internal reduced-order simulation weighting. It is not a user-facing damage severity or structural condition score."
+  }
+}
