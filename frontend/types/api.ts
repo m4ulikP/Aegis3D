@@ -311,3 +311,60 @@ export interface ProcessingTraceResponse {
     health: HealthTrace;
     alert: AlertTrace;
 }
+
+export type LiveEventType =
+    | "processing_started"
+    | "stage_started"
+    | "stage_completed"
+    | "processing_completed"
+    | "processing_error"
+    | "heartbeat";
+
+export type ProcessingStage =
+    | "INGESTION"
+    | "CONDITIONING"
+    | "EVENT_DETECTION"
+    | "FEATURE_EXTRACTION"
+    | "BASELINE_REFERENCE"
+    | "ANOMALY_EVALUATION"
+    | "PERSISTENCE"
+    | "CROSS_SENSOR_CORRELATION"
+    | "HEALTH_AND_ALERT";
+
+export type LiveConnectionState =
+    | "DISCONNECTED"
+    | "CONNECTING"
+    | "CONNECTED"
+    | "PROCESSING"
+    | "COMPLETED"
+    | "ERROR"
+    | "RECONNECTING";
+
+export interface LiveProcessingEvent {
+    type: LiveEventType;
+    trace_id?: string | null;
+    event_id?: number | null;
+    sensor_id?: string | null;
+    zone_id?: number | null;
+    zone_name?: string | null;
+    stage?: ProcessingStage | null;
+    stage_index?: number | null;
+    status: string;
+    timestamp: string;
+    sequence?: number | null;
+    duration_ms?: number | null;
+    summary?: string | null;
+    error_message?: string | null;
+    metadata?: Record<string, any> | null;
+}
+
+export type LiveStageStatus = "pending" | "processing" | "completed" | "error";
+
+export interface LiveStageInfo {
+    id: number;
+    stage: ProcessingStage;
+    status: LiveStageStatus;
+    summary?: string | null;
+    timestamp?: string | null;
+    duration_ms?: number | null;
+}

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { api } from "@/lib/api";
 import { theme } from "@/lib/theme";
+import { useLiveTelemetry } from "@/hooks/useLiveTelemetry";
 import {
     AlertSeverity,
     AlertTrace,
@@ -15,6 +16,9 @@ import {
     FeatureExtractionTrace,
     HealthStatus,
     HealthTrace,
+    LiveConnectionState,
+    LiveProcessingEvent,
+    LiveStageInfo,
     PersistenceTrace,
     ProcessingTraceResponse,
     RawTelemetryTrace,
@@ -126,6 +130,8 @@ interface DynamicStagePaginationProps {
     onSelectStage: (stageId: number) => void;
     onPrevStage: () => void;
     onNextStage: () => void;
+    stageStatuses?: Record<number, LiveStageInfo>;
+    activeLiveStage?: number | null;
 }
 
 function DynamicStagePagination({
@@ -133,6 +139,8 @@ function DynamicStagePagination({
     onSelectStage,
     onPrevStage,
     onNextStage,
+    stageStatuses,
+    activeLiveStage,
 }: DynamicStagePaginationProps) {
     const [hoveredStageId, setHoveredStageId] = useState<number | null>(null);
 
@@ -218,6 +226,26 @@ function DynamicStagePagination({
                             const opacity = distance === 0 ? 1 : distance === 1 ? 0.75 : distance === 2 ? 0.5 : distance === 3 ? 0.28 : 0.14;
                             const isHovered = hoveredStageId === stage.id;
 
+                            const liveInfo = stageStatuses?.[stage.id];
+                            const isLiveActive = activeLiveStage === stage.id;
+                            const isLiveCompleted = liveInfo?.status === "completed";
+                            const isLiveError = liveInfo?.status === "error";
+
+                            let dotBg = isActive ? "#38bdf8" : isHovered ? "#67e8f9" : "#94a3b8";
+                            let dotBorder = isActive ? "1.5px solid #7dd3fc" : "none";
+                            let dotShadow = isActive ? "0 1px 3px rgba(0, 0, 0, 0.5), 0 0 2px rgba(56, 189, 248, 0.3)" : "none";
+
+                            if (isLiveActive) {
+                                dotBg = "#f59e0b";
+                                dotBorder = "1.5px solid #fde68a";
+                                dotShadow = "0 0 8px rgba(245, 158, 11, 0.85)";
+                            } else if (isLiveError) {
+                                dotBg = "#ef4444";
+                                dotBorder = "1.5px solid #fca5a5";
+                            } else if (isLiveCompleted && !isActive) {
+                                dotBg = "rgba(34, 197, 94, 0.8)";
+                            }
+
                             return (
                                 <div
                                     key={stage.id}
@@ -243,8 +271,14 @@ function DynamicStagePagination({
                                                 left: "50%",
                                                 transform: "translateX(-50%)",
                                                 background: "rgba(15, 23, 42, 0.95)",
-                                                border: "1px solid rgba(56, 189, 248, 0.4)",
-                                                color: "#67e8f9",
+                                                border: `1px solid ${
+                                                    isLiveActive
+                                                        ? "rgba(245, 158, 11, 0.5)"
+                                                        : isLiveError
+                                                        ? "rgba(239, 68, 68, 0.5)"
+                                                        : "rgba(56, 189, 248, 0.4)"
+                                                }`,
+                                                color: isLiveActive ? "#fde68a" : isLiveError ? "#fca5a5" : "#67e8f9",
                                                 fontSize: 9,
                                                 fontWeight: 700,
                                                 fontFamily: theme.typography.fontMono,
@@ -257,6 +291,7 @@ function DynamicStagePagination({
                                             }}
                                         >
                                             {stage.numberStr.slice(0, 2)}: {stage.title}
+                                            {isLiveActive ? " [PROCESSING]" : isLiveError ? " [ERROR]" : isLiveCompleted ? " [✓]" : ""}
                                         </div>
                                     )}
 
@@ -265,16 +300,16 @@ function DynamicStagePagination({
                                         aria-label={`Go to ${stage.title}`}
                                         aria-current={isActive ? "step" : undefined}
                                         style={{
-                                            width: isActive ? 10 : 7,
-                                            height: isActive ? 10 : 7,
+                                            width: isActive || isLiveActive ? 10 : 7,
+                                            height: isActive || isLiveActive ? 10 : 7,
                                             borderRadius: "50%",
-                                            background: isActive ? "#38bdf8" : isHovered ? "#67e8f9" : "#94a3b8",
-                                            border: isActive ? "1.5px solid #7dd3fc" : "none",
-                                            opacity: isHovered ? 1 : opacity,
+                                            background: dotBg,
+                                            border: dotBorder,
+                                            opacity: isHovered || isLiveActive ? 1 : opacity,
                                             padding: 0,
                                             cursor: "pointer",
                                             transition: "all 200ms cubic-bezier(0.2, 0.8, 0.2, 1)",
-                                            boxShadow: isActive ? "0 1px 3px rgba(0, 0, 0, 0.5), 0 0 2px rgba(56, 189, 248, 0.3)" : "none",
+                                            boxShadow: dotShadow,
                                         }}
                                         className="stage-dot-btn"
                                     />
@@ -3588,6 +3623,290 @@ function HealthAlertSection({
 }
 
 // ==========================================
+// LIVE PROCESSING DASHBOARD COMPONENT
+// ==========================================
+interface LiveProcessingDashboardProps {
+    connectionState: LiveConnectionState;
+    activeStage: number | null;
+    stageStatuses: Record<number, LiveStageInfo>;
+    activeRunId: string | null;
+    errorMessage: string | null;
+    backendDurationMs?: number | null;
+    isPlaybackActive?: boolean;
+    queueDepth?: number;
+    onSkipPlayback?: () => void;
+    onSelectStage: (stageId: number) => void;
+    onReconnect: () => void;
+}
+
+function LiveProcessingDashboard({
+    connectionState,
+    activeStage,
+    stageStatuses,
+    activeRunId,
+    errorMessage,
+    backendDurationMs,
+    isPlaybackActive,
+    queueDepth = 0,
+    onSkipPlayback,
+    onSelectStage,
+    onReconnect,
+}: LiveProcessingDashboardProps) {
+    const isProcessing = connectionState === "PROCESSING";
+
+    return (
+        <div
+            style={{
+                background: "rgba(15, 23, 42, 0.75)",
+                border: `1px solid ${
+                    isProcessing
+                        ? "rgba(245, 158, 11, 0.4)"
+                        : connectionState === "ERROR"
+                        ? "rgba(239, 68, 68, 0.4)"
+                        : "rgba(148, 163, 184, 0.15)"
+                }`,
+                borderRadius: 8,
+                padding: "12px 14px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+            }}
+        >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span
+                        style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: "50%",
+                            background:
+                                isProcessing
+                                    ? "#f59e0b"
+                                    : connectionState === "CONNECTED"
+                                    ? "#22c55e"
+                                    : connectionState === "ERROR"
+                                    ? "#ef4444"
+                                    : "#38bdf8",
+                            boxShadow: isProcessing ? "0 0 8px rgba(245, 158, 11, 0.8)" : "none",
+                        }}
+                    />
+                    <span
+                        style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: isProcessing ? "#fde68a" : "#f1f5f9",
+                            fontFamily: theme.typography.fontMono,
+                        }}
+                    >
+                        {isProcessing
+                            ? `PIPELINE EXECUTING · STAGE ${activeStage ? `0${activeStage}`.slice(-2) : "--"} / 09`
+                            : connectionState === "CONNECTED"
+                            ? "PIPELINE IDLE · LISTENING"
+                            : connectionState === "COMPLETED"
+                            ? "PIPELINE COMPLETED · TRACE SYNCED"
+                            : connectionState}
+                    </span>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {/* Timing Transparency Badge: Real backend speed vs readable human presentation */}
+                    {backendDurationMs !== null && backendDurationMs !== undefined && (
+                        <span
+                            style={{
+                                fontSize: 9,
+                                fontWeight: 700,
+                                color: "#38bdf8",
+                                background: "rgba(56, 189, 248, 0.1)",
+                                border: "1px solid rgba(56, 189, 248, 0.25)",
+                                padding: "2px 6px",
+                                borderRadius: 4,
+                                fontFamily: theme.typography.fontMono,
+                            }}
+                            title="Actual backend pipeline execution duration"
+                        >
+                            BACKEND: {backendDurationMs < 1 ? "<1ms" : `${backendDurationMs}ms`}
+                        </span>
+                    )}
+
+                    {/* Skip presentation delay button */}
+                    {isProcessing && onSkipPlayback && (
+                        <button
+                            onClick={onSkipPlayback}
+                            style={{
+                                background: "rgba(245, 158, 11, 0.15)",
+                                border: "1px solid rgba(245, 158, 11, 0.4)",
+                                color: "#fde68a",
+                                borderRadius: 4,
+                                padding: "2px 6px",
+                                fontSize: 9,
+                                fontWeight: 700,
+                                fontFamily: theme.typography.fontMono,
+                                cursor: "pointer",
+                                transition: "all 0.15s ease",
+                            }}
+                            title="Skip human playback dwell and jump directly to completed result"
+                        >
+                            FAST-FWD ▶▶
+                        </button>
+                    )}
+
+                    {activeRunId && (
+                        <span style={{ fontSize: 9, color: "#94a3b8", fontFamily: theme.typography.fontMono }}>
+                            {activeRunId}
+                        </span>
+                    )}
+                    {connectionState === "ERROR" && (
+                        <button
+                            onClick={onReconnect}
+                            style={{
+                                background: "rgba(239, 68, 68, 0.2)",
+                                border: "1px solid rgba(239, 68, 68, 0.4)",
+                                color: "#fca5a5",
+                                borderRadius: 4,
+                                padding: "2px 6px",
+                                fontSize: 9,
+                                fontFamily: theme.typography.fontMono,
+                                cursor: "pointer",
+                            }}
+                        >
+                            Reconnect
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Subtitle distinguishing real backend execution from readable presentation */}
+            {isProcessing && (
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        fontSize: 9,
+                        color: "#64748b",
+                        fontFamily: theme.typography.fontMono,
+                        padding: "3px 6px",
+                        background: "rgba(30, 41, 59, 0.35)",
+                        borderRadius: 4,
+                    }}
+                >
+                    <span>PRESENTING REAL SSE EVIDENCE AT READABLE PACE</span>
+                    {queueDepth > 0 && <span style={{ color: "#f59e0b", fontWeight: 700 }}>({queueDepth} NEW RUN QUEUED)</span>}
+                </div>
+            )}
+
+            {errorMessage && (
+                <div
+                    style={{
+                        fontSize: 10,
+                        color: "#fca5a5",
+                        background: "rgba(239, 68, 68, 0.1)",
+                        padding: "6px 8px",
+                        borderRadius: 4,
+                        border: "1px solid rgba(239, 68, 68, 0.2)",
+                        fontFamily: theme.typography.fontMono,
+                    }}
+                >
+                    {errorMessage}
+                </div>
+            )}
+
+            {/* 9 Stages Live Progression Matrix */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {STAGES.map((s) => {
+                    const info = stageStatuses[s.id];
+                    const isActive = s.id === activeStage;
+                    const isCompleted = info?.status === "completed";
+                    const isError = info?.status === "error";
+
+                    return (
+                        <button
+                            key={s.id}
+                            onClick={() => onSelectStage(s.id)}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "5px 8px",
+                                borderRadius: 4,
+                                background: isActive
+                                    ? "rgba(245, 158, 11, 0.15)"
+                                    : isCompleted
+                                    ? "rgba(34, 197, 94, 0.08)"
+                                    : "rgba(30, 41, 59, 0.35)",
+                                border: `1px solid ${
+                                    isActive
+                                        ? "rgba(245, 158, 11, 0.4)"
+                                        : isCompleted
+                                        ? "rgba(34, 197, 94, 0.25)"
+                                        : "rgba(148, 163, 184, 0.08)"
+                                }`,
+                                cursor: "pointer",
+                                textAlign: "left",
+                                width: "100%",
+                                color: "inherit",
+                                fontFamily: theme.typography.fontMono,
+                                transition: "all 0.15s ease",
+                            }}
+                        >
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <span style={{ fontSize: 9.5, color: "#64748b" }}>{s.numberStr.slice(0, 2)}</span>
+                                <span
+                                    style={{
+                                        fontSize: 10,
+                                        fontWeight: isActive ? 700 : 500,
+                                        color: isActive ? "#fde68a" : isCompleted ? "#e2e8f0" : "#94a3b8",
+                                    }}
+                                >
+                                    {s.title}
+                                </span>
+                            </div>
+
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                {info?.summary && (
+                                    <span
+                                        style={{
+                                            fontSize: 9,
+                                            color: "#94a3b8",
+                                            maxWidth: 160,
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap",
+                                        }}
+                                    >
+                                        {info.summary}
+                                    </span>
+                                )}
+                                {isActive && (
+                                    <span style={{ fontSize: 9, fontWeight: 700, color: "#f59e0b" }}>
+                                        ● PROCESSING
+                                    </span>
+                                )}
+                                {isCompleted && (
+                                    <span style={{ fontSize: 9, fontWeight: 700, color: "#4ade80" }}>
+                                        ✓
+                                    </span>
+                                )}
+                                {isError && (
+                                    <span style={{ fontSize: 9, fontWeight: 700, color: "#ef4444" }}>
+                                        ✕ ERROR
+                                    </span>
+                                )}
+                                {!isActive && !isCompleted && !isError && (
+                                    <span style={{ fontSize: 9, color: "#64748b" }}>
+                                        ○
+                                    </span>
+                                )}
+                            </div>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+// ==========================================
 // 11. MAIN TELEMETRY PROCESSING INSPECTOR
 // ==========================================
 interface TelemetryProcessingInspectorProps {
@@ -3596,6 +3915,7 @@ interface TelemetryProcessingInspectorProps {
     eventId?: number | null;
     identifier?: string | null;
     isOpen?: boolean;
+    initialMode?: "live" | "archive";
 }
 
 export default function TelemetryProcessingInspector({
@@ -3604,6 +3924,7 @@ export default function TelemetryProcessingInspector({
     eventId,
     identifier,
     isOpen = true,
+    initialMode,
 }: TelemetryProcessingInspectorProps) {
     const [isVisible, setIsVisible] = useState<boolean>(false);
     const [isClosing, setIsClosing] = useState<boolean>(false);
@@ -3637,6 +3958,56 @@ export default function TelemetryProcessingInspector({
         }
     }, [currentStage]);
 
+    // Live Telemetry Hook: Backend-driven real stage progression and authoritative completed-trace handoff
+    const handleLiveCompleted = useCallback((traceId: string, completedEventId?: number | null) => {
+        const identifierToFetch = completedEventId ? String(completedEventId) : traceId;
+
+        if (identifierToFetch) {
+            setLoading(true);
+            api.getProcessingTrace(identifierToFetch)
+                .then((data) => {
+                    setTrace(data);
+                    setLoading(false);
+                    setError(null);
+
+                    // Automatic Page 1 Reset:
+                    // After the authoritative completed trace is successfully loaded,
+                    // automatically set the view to Page 1 (Ingestion) so the presenter
+                    // can explain the completed run from the beginning without clicking back.
+                    setCurrentStage(1);
+                    setNavDirection("prev");
+                })
+                .catch((err: any) => {
+                    console.warn(`[Inspector] Failed to fetch authoritative trace for '${identifierToFetch}':`, err);
+                    setError(err.message || `Failed to fetch authoritative trace for '${identifierToFetch}'`);
+                    setLoading(false);
+                });
+        }
+    }, []);
+
+    const {
+        connectionState,
+        activeStage: activeLiveStage,
+        stageStatuses,
+        latestEvent: liveEvent,
+        errorMessage: liveError,
+        backendDurationMs,
+        isPlaybackActive,
+        queueDepth,
+        skipPlayback,
+        reconnect: reconnectLive,
+    } = useLiveTelemetry({
+        enabled: isOpen,
+        onCompleted: handleLiveCompleted,
+    });
+
+    // Auto-advance active stage when backend emits stage progression during live processing
+    useEffect(() => {
+        if (connectionState === "PROCESSING" && activeLiveStage) {
+            handleSelectStage(activeLiveStage);
+        }
+    }, [connectionState, activeLiveStage, handleSelectStage]);
+
     // Stage 02 RAW <-> CONDITIONED visual transition morph hook
     const rawSamples = trace?.ingestion?.samples_bounded || [];
     const conditionedSamples = trace?.conditioning?.conditioned_samples_bounded || [];
@@ -3664,7 +4035,7 @@ export default function TelemetryProcessingInspector({
         return "latest";
     }, [identifier, eventId, telemetry]);
 
-    // Fetch processing trace when inspector is open
+    // Fetch initial processing trace when inspector opens with an explicit identifier
     useEffect(() => {
         if (!isOpen) return;
 
@@ -3681,17 +4052,24 @@ export default function TelemetryProcessingInspector({
             })
             .catch((err: any) => {
                 if (isMounted) {
-                    console.warn(`[Inspector] Failed to load processing trace for '${targetIdentifier}':`, err);
-                    setError(err.message || `Failed to load processing trace for '${targetIdentifier}'`);
-                    setTrace(null);
-                    setLoading(false);
+                    // Without explicit identifier, if backend has no trace yet (404),
+                    // stay idle and awaiting live telemetry instead of showing a hard failure.
+                    if (!identifier && eventId === undefined) {
+                        setTrace(null);
+                        setLoading(false);
+                    } else {
+                        console.warn(`[Inspector] Failed to load processing trace for '${targetIdentifier}':`, err);
+                        setError(err.message || `Failed to load processing trace for '${targetIdentifier}'`);
+                        setTrace(null);
+                        setLoading(false);
+                    }
                 }
             });
 
         return () => {
             isMounted = false;
         };
-    }, [isOpen, targetIdentifier]);
+    }, [isOpen, targetIdentifier, identifier, eventId]);
 
     // Entrance animation hook
     useEffect(() => {
@@ -3717,7 +4095,11 @@ export default function TelemetryProcessingInspector({
         window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const isAnimated = isVisible && !isClosing;
-    const currentSensorId = trace?.metadata.sensor_id || telemetry?.sensor_id || "PZT-Z1-01";
+    const currentSensorId =
+        liveEvent?.sensor_id ||
+        trace?.metadata.sensor_id ||
+        telemetry?.sensor_id ||
+        "PZT-Z1-01";
     const currentZoneName = trace?.metadata.zone_name || telemetry?.zone_name || "Zone 1 - Main Deck Girder";
 
     return (
@@ -3804,35 +4186,93 @@ export default function TelemetryProcessingInspector({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    padding: "12px 14px",
-                    background: "rgba(15, 23, 42, 0.6)",
+                    padding: "10px 14px",
+                    background: "rgba(15, 23, 42, 0.75)",
                     borderBottom: "1px solid rgba(148, 163, 184, 0.15)",
                 }}
             >
-                <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <h2
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <h2
+                                style={{
+                                    margin: 0,
+                                    fontSize: 12.5,
+                                    fontWeight: 700,
+                                    letterSpacing: "0.06em",
+                                    color: "#67e8f9",
+                                    textTransform: "uppercase",
+                                }}
+                            >
+                                Processing Inspector
+                            </h2>
+                        </div>
+
+                        <div
                             style={{
-                                margin: 0,
-                                fontSize: 13,
-                                fontWeight: 700,
-                                letterSpacing: "0.06em",
-                                color: "#67e8f9",
-                                textTransform: "uppercase",
+                                fontSize: 10,
+                                color: theme.text.muted,
+                                fontFamily: theme.typography.fontMono,
+                                marginTop: 3,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
                             }}
                         >
-                            Telemetry Processing Inspector
-                        </h2>
-                    </div>
-                    <div
-                        style={{
-                            fontSize: 10,
-                            color: theme.text.muted,
-                            fontFamily: theme.typography.fontMono,
-                            marginTop: 2,
-                        }}
-                    >
-                        Target Node: {currentSensorId} · {currentZoneName}
+                            <span>Target Node: {currentSensorId} · {currentZoneName}</span>
+                            <span
+                                style={{
+                                    padding: "1px 5px",
+                                    borderRadius: 3,
+                                    fontSize: 8.5,
+                                    fontWeight: 700,
+                                    letterSpacing: "0.04em",
+                                    background:
+                                        connectionState === "PROCESSING"
+                                            ? "rgba(245, 158, 11, 0.2)"
+                                            : connectionState === "CONNECTED"
+                                            ? "rgba(34, 197, 94, 0.15)"
+                                            : connectionState === "ERROR"
+                                            ? "rgba(239, 68, 68, 0.2)"
+                                            : connectionState === "COMPLETED"
+                                            ? "rgba(56, 189, 248, 0.15)"
+                                            : "rgba(148, 163, 184, 0.15)",
+                                    color:
+                                        connectionState === "PROCESSING"
+                                            ? "#fde68a"
+                                            : connectionState === "CONNECTED"
+                                            ? "#4ade80"
+                                            : connectionState === "ERROR"
+                                            ? "#fca5a5"
+                                            : connectionState === "COMPLETED"
+                                            ? "#38bdf8"
+                                            : "#94a3b8",
+                                    border: `1px solid ${
+                                        connectionState === "PROCESSING"
+                                            ? "rgba(245, 158, 11, 0.35)"
+                                            : connectionState === "CONNECTED"
+                                            ? "rgba(34, 197, 94, 0.3)"
+                                            : connectionState === "ERROR"
+                                            ? "rgba(239, 68, 68, 0.35)"
+                                            : connectionState === "COMPLETED"
+                                            ? "rgba(56, 189, 248, 0.25)"
+                                            : "rgba(148, 163, 184, 0.2)"
+                                    }`,
+                                }}
+                            >
+                                {connectionState === "PROCESSING"
+                                    ? `● LIVE · STAGE 0${activeLiveStage || 1}${backendDurationMs !== null && backendDurationMs !== undefined ? ` (${backendDurationMs < 1 ? "<1" : backendDurationMs}ms)` : ""}`
+                                    : connectionState === "CONNECTED"
+                                    ? "● LIVE"
+                                    : connectionState === "RECONNECTING"
+                                    ? "RECONNECTING..."
+                                    : connectionState === "COMPLETED"
+                                    ? `● PROCESSING COMPLETE${backendDurationMs !== null && backendDurationMs !== undefined ? ` (${backendDurationMs < 1 ? "<1" : backendDurationMs}ms)` : ""}`
+                                    : connectionState === "ERROR"
+                                    ? "OFFLINE"
+                                    : "● LIVE"}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -3867,6 +4307,8 @@ export default function TelemetryProcessingInspector({
                 onSelectStage={handleSelectStage}
                 onPrevStage={handlePrevStage}
                 onNextStage={handleNextStage}
+                stageStatuses={stageStatuses}
+                activeLiveStage={activeLiveStage}
             />
 
             {/* Content Body: Only Renders the Current Paginated Stage */}
@@ -3881,8 +4323,70 @@ export default function TelemetryProcessingInspector({
                     gap: 12,
                 }}
             >
+                {/* Live Processing Pipeline Overlay (When actively processing live) */}
+                {connectionState === "PROCESSING" && (
+                    <LiveProcessingDashboard
+                        connectionState={connectionState}
+                        activeStage={activeLiveStage}
+                        stageStatuses={stageStatuses}
+                        activeRunId={liveEvent?.trace_id || (liveEvent?.event_id ? `evt-${liveEvent.event_id}` : null)}
+                        errorMessage={liveError || null}
+                        backendDurationMs={backendDurationMs}
+                        isPlaybackActive={isPlaybackActive}
+                        queueDepth={queueDepth}
+                        onSkipPlayback={skipPlayback}
+                        onSelectStage={handleSelectStage}
+                        onReconnect={reconnectLive}
+                    />
+                )}
+
+                {/* Awaiting Telemetry State (Connected/Idle but no trace yet) */}
+                {!trace && !loading && !error && connectionState !== "PROCESSING" && (
+                    <div
+                        style={{
+                            background: "rgba(15, 23, 42, 0.65)",
+                            border: "1px dashed rgba(56, 189, 248, 0.3)",
+                            borderRadius: 8,
+                            padding: "20px 16px",
+                            textAlign: "center",
+                            fontFamily: theme.typography.fontMono,
+                        }}
+                    >
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                            <span
+                                style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "50%",
+                                    background: connectionState === "CONNECTED" ? "#22c55e" : "#f59e0b",
+                                    boxShadow: connectionState === "CONNECTED" ? "0 0 8px rgba(34, 197, 94, 0.6)" : "none",
+                                }}
+                            />
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "#38bdf8", letterSpacing: "0.04em" }}>
+                                {connectionState === "CONNECTED" ? "LIVE STREAM ACTIVE · AWAITING TELEMETRY" : `LIVE STREAM · ${connectionState}`}
+                            </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.5, maxWidth: 320, margin: "0 auto 10px auto" }}>
+                            Connected to backend event bus (<code style={{ color: "#38bdf8" }}>/api/v1/telemetry/live</code>). Ready for real-time sensor packet ingestion.
+                        </div>
+                        <div
+                            style={{
+                                display: "inline-block",
+                                fontSize: 9.5,
+                                color: "#f59e0b",
+                                background: "rgba(245, 158, 11, 0.08)",
+                                border: "1px solid rgba(245, 158, 11, 0.2)",
+                                padding: "4px 8px",
+                                borderRadius: 4,
+                            }}
+                        >
+                            NO TELEMETRY ≠ HEALTHY · SYSTEM IDLE
+                        </div>
+                    </div>
+                )}
+
                 {/* 1. Loading State */}
-                {loading && (
+                {loading && !trace && (
                     <div
                         style={{
                             background: "rgba(15, 23, 42, 0.5)",
