@@ -34,6 +34,8 @@ class SensorDefinition:
     position: Tuple[float, float, float]
     role: str
     status: str
+    zone_id: Optional[int] = None
+    zone_name: Optional[str] = None
 
 
 class SensorRegistry:
@@ -67,6 +69,8 @@ class SensorRegistry:
                 position=tuple(raw["position"]),
                 role=raw["role"],
                 status=raw["status"],
+                zone_id=raw.get("zone_id"),
+                zone_name=raw.get("zone_name"),
             )
 
             self._sensors[sensor.sensor_id] = sensor

@@ -21,7 +21,7 @@ The Aegis3D Telemetry Layer provides discrete sensor time-series ingestion for t
 ### Request Schema (`TelemetryIngestRequest`)
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `sensor_id` | `string` | Yes | Stable sensor identifier (e.g., `"PZT-Z1-01"`, `"PZT-Z2-01"`). |
+| `sensor_id` | `string` | Yes | Stable sensor identifier (e.g., `"PZT-Z05"`, `"PZT-Z01"`). |
 | `zone_name` | `string` | Yes | Stable domain zone name (e.g., `"Zone 1 - Main Deck Girder"`). |
 | `timestamp` | `datetime` | No (default UTC now) | Sensor acquisition timestamp in UTC. |
 | `sample_rate_hz` | `float` | Yes | Sampling frequency in Hz (`> 0`, alias `"sample_rate"`). |
@@ -33,7 +33,7 @@ The Aegis3D Telemetry Layer provides discrete sensor time-series ingestion for t
 ### Example Request
 ```json
 {
-  "sensor_id": "PZT-Z1-01",
+  "sensor_id": "PZT-Z05",
   "zone_name": "Zone 1 - Main Deck Girder",
   "timestamp": "2026-09-28T12:00:00Z",
   "sample_rate_hz": 1000.0,
@@ -47,7 +47,7 @@ The Aegis3D Telemetry Layer provides discrete sensor time-series ingestion for t
 {
   "status": "PROCESSED_ANOMALY_DETECTED",
   "telemetry_accepted": true,
-  "sensor_id": "PZT-Z1-01",
+  "sensor_id": "PZT-Z05",
   "zone_id": 1,
   "zone_name": "Zone 1 - Main Deck Girder",
   "timestamp": "2026-09-28T12:00:00Z",
@@ -89,7 +89,7 @@ The Aegis3D Telemetry Layer provides discrete sensor time-series ingestion for t
   "alert_id": null,
   "alert_severity": null,
   "alert_title": null,
-  "message": "Telemetry from 'PZT-Z1-01' processed: 1 event(s) detected. SHI: 75.0/100 (MONITOR)."
+  "message": "Telemetry from 'PZT-Z05' processed: 1 event(s) detected. SHI: 75.0/100 (MONITOR)."
 }
 ```
 
@@ -137,7 +137,7 @@ Threshold Activity Detection (`detect_events`)
 
 ## 5. Sensor & Zone Identity Resolution
 - **Stable Zone Identity**: Uses immutable domain zone names (`"Zone 1 - Main Deck Girder"`, `"Zone 2 - Substructure Pier B"`). The backend dynamically resolves the active PostgreSQL autoincrement primary key ID.
-- **Stable Sensor Identity**: Identifiers follow standard naming convention (`"PZT-Z1-01"`, `"PZT-Z1-02"`, `"PZT-Z2-01"`). Inconsistent sensor/zone combinations (e.g. `PZT-Z2-01` sent for Zone 1) are rejected with HTTP 400.
+- **Stable Sensor Identity**: Identifiers follow the canonical naming convention (`"PZT-Z01"`–`"PZT-Z12"`, where `PZT-Z01`–`Z04` map to Zone 2 / Entry Level and `PZT-Z05`–`Z08` map to Zone 1 / Floor 02; `PZT-Z09`–`Z12` are Storey 03 sensors intentionally unassigned from the active monitoring-zone model). Inconsistent sensor/zone combinations (e.g. `PZT-Z01` sent for Zone 1) are rejected with HTTP 400.
 
 ---
 

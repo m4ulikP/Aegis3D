@@ -9,22 +9,18 @@ from typing import Dict, Optional
 ZONE_MAIN_DECK: str = "Zone 1 - Main Deck Girder"
 ZONE_SUBSTRUCTURE: str = "Zone 2 - Substructure Pier B"
 
-# Canonical sensor-to-zone associations (PZT-Z01…Z12).
-# Z01–Z06 → Zone 1 (Main Deck Girder / Level 2 floor system)
-# Z07–Z12 → Zone 2 (Substructure Pier B)
+# Canonical sensor-to-zone associations derived from BIM sensor registry:
+# Storey "01 - Entry Level" → Zone 2 (Substructure Pier B): PZT-Z01 … PZT-Z04
+# Storey "02 - Floor"       → Zone 1 (Main Deck Girder):   PZT-Z05 … PZT-Z08
 DEFAULT_SENSOR_ZONE_MAP: Dict[str, str] = {
-    "PZT-Z01": ZONE_MAIN_DECK,
-    "PZT-Z02": ZONE_MAIN_DECK,
-    "PZT-Z03": ZONE_MAIN_DECK,
-    "PZT-Z04": ZONE_MAIN_DECK,
+    "PZT-Z01": ZONE_SUBSTRUCTURE,
+    "PZT-Z02": ZONE_SUBSTRUCTURE,
+    "PZT-Z03": ZONE_SUBSTRUCTURE,
+    "PZT-Z04": ZONE_SUBSTRUCTURE,
     "PZT-Z05": ZONE_MAIN_DECK,
     "PZT-Z06": ZONE_MAIN_DECK,
-    "PZT-Z07": ZONE_SUBSTRUCTURE,
-    "PZT-Z08": ZONE_SUBSTRUCTURE,
-    "PZT-Z09": ZONE_SUBSTRUCTURE,
-    "PZT-Z10": ZONE_SUBSTRUCTURE,
-    "PZT-Z11": ZONE_SUBSTRUCTURE,
-    "PZT-Z12": ZONE_SUBSTRUCTURE,
+    "PZT-Z07": ZONE_MAIN_DECK,
+    "PZT-Z08": ZONE_MAIN_DECK,
 }
 
 

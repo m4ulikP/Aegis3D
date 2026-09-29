@@ -62,6 +62,7 @@ class VirtualPZTSensor:
         sensor_id: str,
         zone_name: Optional[str] = None,
         sample_rate_hz: float = 1000.0,
+        initial_sequence: int = 0,
     ) -> None:
         if not sensor_id:
             raise ValueError("sensor_id cannot be empty")
@@ -70,6 +71,9 @@ class VirtualPZTSensor:
             raise ValueError(
                 f"sample_rate_hz must be positive, got {sample_rate_hz}"
             )
+
+        if initial_sequence < 0:
+            raise ValueError("initial_sequence cannot be negative")
 
         self.sensor_id = sensor_id
 
@@ -80,7 +84,7 @@ class VirtualPZTSensor:
         )
 
         self.sample_rate_hz = sample_rate_hz
-        self.sequence = 0
+        self.sequence = initial_sequence
 
         # Receiver/acquisition stage.
         #
@@ -173,7 +177,10 @@ class VirtualPZTSensor:
         sample_count: int = 1000,
         seed: Optional[int] = 42,
         threshold: Optional[float] = None,
-        session_id: Optional[str] = None,
+        detection_threshold: Optional[float] = None,
+        session_id: Optional[Any] = None,
+        samples: Optional[List[float]] = None,
+        timestamp: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Generate a telemetry payload compatible with the existing
@@ -187,54 +194,67 @@ class VirtualPZTSensor:
 
         mode = mode.lower().strip()
 
-        if sample_count <= 0:
-            raise ValueError(
-                f"sample_count must be positive, got {sample_count}"
-            )
-
-        if mode in {"normal", "healthy"}:
-            samples = self.generate_healthy_signal(
-                sample_count=sample_count,
-                seed=seed,
-            )
-
-        elif mode in {"transient", "event"}:
-            samples = generate_transient_signal(
-                sample_count=sample_count,
-                sample_rate_hz=self.sample_rate_hz,
-                seed=seed,
-            )
-
-        elif mode == "anomaly":
-            samples = generate_anomaly_signal(
-                sample_count=sample_count,
-                sample_rate_hz=self.sample_rate_hz,
-                seed=seed,
-            )
-
+        if samples is not None:
+            signal_samples = [float(x) for x in samples]
         else:
-            raise ValueError(
-                f"Unsupported signal mode: {mode!r}. "
-                "Expected normal, healthy, transient, event, or anomaly."
-            )
+            if sample_count <= 0:
+                raise ValueError(
+                    f"sample_count must be positive, got {sample_count}"
+                )
+
+            if mode in {"normal", "healthy"}:
+                signal_samples = self.generate_healthy_signal(
+                    sample_count=sample_count,
+                    seed=seed,
+                )
+
+            elif mode in {"transient", "event"}:
+                signal_samples = generate_transient_signal(
+                    sample_count=sample_count,
+                    sample_rate_hz=self.sample_rate_hz,
+                    seed=seed,
+                )
+
+            elif mode == "anomaly":
+                signal_samples = generate_anomaly_signal(
+                    sample_count=sample_count,
+                    sample_rate_hz=self.sample_rate_hz,
+                    seed=seed,
+                )
+
+            else:
+                raise ValueError(
+                    f"Unsupported signal mode: {mode!r}. "
+                    "Expected normal, healthy, transient, event, or anomaly."
+                )
 
         # Ensure all values are finite before they reach the backend.
-        if not all(math.isfinite(float(value)) for value in samples):
+        if not all(math.isfinite(float(value)) for value in signal_samples):
             raise ValueError(
                 "Generated signal contains non-finite values"
             )
+
+        if timestamp is not None:
+            if isinstance(timestamp, datetime):
+                ts_str = timestamp.isoformat()
+            else:
+                ts_str = str(timestamp)
+        else:
+            ts_str = datetime.now(timezone.utc).isoformat()
 
         payload: Dict[str, Any] = {
             "sensor_id": self.sensor_id,
             "zone_name": self.zone_name,
             "sample_rate_hz": self.sample_rate_hz,
-            "samples": samples,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "samples": signal_samples,
+            "timestamp": ts_str,
             "sequence": self._next_sequence(),
         }
 
-        if threshold is not None:
-            payload["threshold"] = float(threshold)
+        # Threshold handling
+        effective_threshold = detection_threshold if detection_threshold is not None else threshold
+        if effective_threshold is not None:
+            payload["detection_threshold"] = float(effective_threshold)
 
         if session_id is not None:
             payload["session_id"] = session_id

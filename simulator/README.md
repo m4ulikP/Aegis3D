@@ -19,7 +19,7 @@ The simulator is built to run standalone on a separate laptop (e.g. Laptop 2) ac
 ┌─────────────────────────────────────────────────────────────┐
 │ LAPTOP 2: Virtual Sensor Simulator (Standalone Node)       │
 │                                                             │
-│   VirtualPZTSensor (PZT-Z1-01 / PZT-Z1-02 / PZT-Z2-01)      │
+│   VirtualPZTSensor (PZT-Z01 / PZT-Z02 / PZT-Z05)            │
 │            │                                                │
 │            ▼                                                │
 │   Discrete Signal Generator (Normal / Transient / Anomaly)  │
@@ -89,7 +89,7 @@ The simulator adheres strictly to the backend `TelemetryIngestRequest` contract 
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `sensor_id` | `string` | Yes | Stable sensor identifier (e.g. `"PZT-Z1-01"`, `"PZT-Z2-01"`). |
+| `sensor_id` | `string` | Yes | Stable sensor identifier (e.g. `"PZT-Z01"` [Zone 2], `"PZT-Z05"` [Zone 1]). |
 | `zone_name` | `string` | Yes | Target structural zone (e.g. `"Zone 1 - Main Deck Girder"`). |
 | `timestamp` | `datetime` | Yes | ISO 8601 UTC timestamp of acquisition. |
 | `sample_rate_hz` | `float` | Yes | Sampling frequency in Hertz (`> 0`). |
@@ -106,14 +106,15 @@ The simulator **never** sends backend decision attributes:
 
 ## 4. Sensor & Zone Identities
 
-Aegis3D maintains strict consistency between sensor IDs and target zones. The simulator uses the canonical zone identities and auto-infers target zones:
+Aegis3D maintains strict consistency between sensor IDs and target zones. The simulator uses the canonical BIM sensor registry (`sensors.json`):
 
-| Sensor ID | Monitored Structural Zone | Structural Element Group |
-|---|---|---|
-| `PZT-Z1-01` | `Zone 1 - Main Deck Girder` | Representative Structural Beam Group (133 IfcBeam elements) |
-| `PZT-Z1-02` | `Zone 1 - Main Deck Girder` | Representative Structural Beam Group (133 IfcBeam elements) |
-| `PZT-Z2-01` | `Zone 2 - Substructure Pier B` | Representative Structural Column Group (77 IfcColumn elements) |
-| `PZT-Z2-02` | `Zone 2 - Substructure Pier B` | Representative Structural Column Group (77 IfcColumn elements) |
+| Sensor ID | Storey | Monitored Structural Zone | Structural Element Group |
+|---|---|---|---|
+| `PZT-Z01`–`PZT-Z04` | `01 - Entry Level` | `Zone 2 - Substructure Pier B` | Representative Structural Column Group (`IfcColumn`) |
+| `PZT-Z05`–`PZT-Z08` | `02 - Floor` | `Zone 1 - Main Deck Girder` | Representative Structural Beam Group (`IfcBeam`) |
+| `PZT-Z09`–`PZT-Z12` | `03 - Floor` | *Intentionally unassigned* | Upper Floor Structural Column Group (`IfcColumn`) |
+
+*Note: All 12 canonical sensors are verified in the BIM/physics/sensor-registry layer. Eight sensors are currently assigned to active backend monitoring zones; PZT-Z09–Z12 are valid canonical Storey 03 sensors intentionally unassigned from the current monitoring-zone model and are rejected with HTTP 400 if submitted to Zone 1 or Zone 2.*
 
 ---
 
@@ -138,8 +139,8 @@ Anomaly injection means **altering the discrete sample values**, not sending an 
 
 ### D. 2-PZT Cross-Sensor Correlation (`--mode correlation`)
 - Simulates representative temporally correlated stress signals with a 5 ms relative arrival offset.
-- Sensor 1 (`PZT-Z1-01`) detects the burst wave first.
-- Sensor 2 (`PZT-Z1-02`) detects the wave delayed by $5\text{ ms}$ (well within the backend's $25\text{ ms}$ correlation tolerance) and attenuated by $15\%$.
+- Sensor 1 (`PZT-Z05`) detects the burst wave first.
+- Sensor 2 (`PZT-Z06`) detects the wave delayed by $5\text{ ms}$ (well within the backend's $25\text{ ms}$ correlation tolerance) and attenuated by $15\%$.
 - Backend Result: Groups both events, computes relative lead/lag arrival order, and confirms `cross_sensor_correlation_confirmed: true`.
 
 ---
@@ -250,7 +251,7 @@ python main.py --mode correlation --batches 1
 
 ### Continuous Telemetry Stream
 ```bash
-python main.py --sensor PZT-Z1-01 --mode normal --batches 0 --interval 0.5
+python main.py --sensor PZT-Z01 --mode normal --batches 0 --interval 0.5
 ```
 
 ### Deterministic Seeded Reproduction
@@ -262,7 +263,7 @@ python main.py --mode anomaly --seed 42
 | Option | Default | Description |
 |---|---|---|
 | `--mode` | `normal` | Simulation mode: `normal`, `transient`, `anomaly`, `correlation` |
-| `--sensor` | `PZT-Z1-01` | Sensor ID to transmit from |
+| `--sensor` | `PZT-Z01` | Sensor ID to transmit from |
 | `--zone` | *auto-inferred* | Zone name override |
 | `--backend-url` | *from config* | Target backend URL (e.g. `http://192.168.1.50:8000`) |
 | `--batches` | `1` | Total batch count (`0` or negative for continuous loop) |
@@ -295,8 +296,8 @@ python -m pytest tests/
   - Verify Laptop 1's firewall permits incoming TCP connections on port 8000.
   - Test connectivity from Laptop 2 terminal: `curl http://192.168.x.x:8000/health`.
 
-- **`HTTP 400 Bad Request: Sensor 'PZT-Z2-01' is inconsistent with target zone`**:
-  - Ensure the sensor ID matches the target zone (e.g. `PZT-Z1-*` for Zone 1, `PZT-Z2-*` for Zone 2).
+- **`HTTP 400 Bad Request: Sensor 'PZT-Z01' is inconsistent with target zone`**:
+  - Ensure the sensor ID matches the target zone (`PZT-Z01`–`Z04` for Zone 2, `PZT-Z05`–`Z08` for Zone 1). Note that `PZT-Z09`–`Z12` are valid canonical Storey 03 sensors that are intentionally unassigned from the active monitoring-zone model and cannot be submitted against Zone 1 or Zone 2.
 
 - **`HTTP 404 Not Found: Zone '...' not found`**:
   - Ensure the target zone name matches the backend database (`"Zone 1 - Main Deck Girder"`, `"Zone 2 - Substructure Pier B"`).

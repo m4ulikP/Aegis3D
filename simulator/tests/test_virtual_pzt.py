@@ -18,16 +18,16 @@ except ImportError:
 
 def test_virtual_pzt_initialization_and_inference():
     """Verify sensor initialization and zone name auto-inference."""
-    # Sensor in Zone 1
+    # Sensor in Zone 2 (Substructure)
     s1 = VirtualPZTSensor(sensor_id="PZT-Z01")
     assert s1.sensor_id == "PZT-Z01"
-    assert s1.zone_name == ZONE_MAIN_DECK
+    assert s1.zone_name == ZONE_SUBSTRUCTURE
     assert s1.sample_rate_hz == 1000.0
-    assert s1.sequence == 1
+    assert s1.sequence == 0
 
-    # Sensor in Zone 2
-    s2 = VirtualPZTSensor(sensor_id="PZT-Z07")
-    assert s2.zone_name == ZONE_SUBSTRUCTURE
+    # Sensor in Zone 1 (Main Deck)
+    s2 = VirtualPZTSensor(sensor_id="PZT-Z05")
+    assert s2.zone_name == ZONE_MAIN_DECK
 
     # Custom zone override
     s_custom = VirtualPZTSensor(sensor_id="PZT-CUSTOM", zone_name="Custom Structural Area")

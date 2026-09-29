@@ -67,7 +67,7 @@ The pipeline preserves this exact conceptual execution order:
   "type": "stage_completed",
   "trace_id": "trace-evt-170",
   "event_id": 170,
-  "sensor_id": "PZT-Z1-01",
+  "sensor_id": "PZT-Z05",
   "zone_id": 1,
   "stage": "ANOMALY_EVALUATION",
   "status": "completed",
