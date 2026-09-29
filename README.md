@@ -189,8 +189,8 @@ Aegis3D supports multi-sensor acoustic wave arrival correlation:
 
 The Structural Health Indicator (SHI) is a bounded, deterministic prototype score strictly ranging from `0` to `100`:
 
-$$\text{raw\_score} = 100.0 - (\text{anomaly\_penalty} + \text{persistence\_penalty} + \text{correlation\_penalty} + \text{trend\_penalty})$$
-$$\text{SHI} = \max(0.0, \min(100.0, \text{raw\_score}))$$
+$$\text{raw score} = 100.0 - (\text{anomaly penalty} + \text{persistence penalty} + \text{correlation penalty} + \text{trend penalty})$$
+$$\text{SHI} = \max(0.0, \min(100.0, \text{raw score}))$$
 
 ### Itemized Penalty Deductions
 - **Individual Anomaly Activity**: $-15.0$ pts (triggered when $|z| \ge 3.0$)
