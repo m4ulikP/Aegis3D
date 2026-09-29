@@ -1,10 +1,40 @@
-export type HealthStatus = "NORMAL" | "MONITOR" | "INSPECTION_ADVISED" | "HIGH_PRIORITY_INSPECTION";
-export type HealthTrend = "STABLE" | "INCREASING" | "DECREASING";
-export type AlertSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-export type AlertStatus = "ACTIVE" | "ACKNOWLEDGED" | "RESOLVED";
-export type EventSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-export type EventStatus = "DETECTED" | "REVIEWED" | "DISMISSED";
-export type EventSourceType = "SIMULATOR" | "SENSOR" | "IMPORTED";
+export type HealthStatus =
+    | "NORMAL"
+    | "MONITOR"
+    | "INSPECTION_ADVISED"
+    | "HIGH_PRIORITY_INSPECTION";
+
+export type HealthTrend =
+    | "STABLE"
+    | "INCREASING"
+    | "DECREASING";
+
+export type AlertSeverity =
+    | "LOW"
+    | "MEDIUM"
+    | "HIGH"
+    | "CRITICAL";
+
+export type AlertStatus =
+    | "ACTIVE"
+    | "ACKNOWLEDGED"
+    | "RESOLVED";
+
+export type EventSeverity =
+    | "LOW"
+    | "MEDIUM"
+    | "HIGH"
+    | "CRITICAL";
+
+export type EventStatus =
+    | "DETECTED"
+    | "REVIEWED"
+    | "DISMISSED";
+
+export type EventSourceType =
+    | "SIMULATOR"
+    | "SENSOR"
+    | "IMPORTED";
 
 export interface HealthSummaryResponse {
     total_zones: number;
@@ -74,19 +104,58 @@ export interface EventResponse {
     metadata?: Record<string, any> | null;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Zone trend / correlation                                                   */
+/* -------------------------------------------------------------------------- */
+
+export interface PeriodMetricsSchema {
+    total_events: number;
+    anomalous_events: number;
+    anomaly_rate: number;
+    mean_magnitude?: number;
+    persistent_anomaly_count: number;
+    cross_sensor_event_count: number;
+}
+
 export interface ZoneTrendResponse {
     zone_id: number;
     overall_trend_direction: string;
-    period_comparison_note: string;
+    event_rate_change_ratio: number;
+    magnitude_delta: number;
+    is_statistically_significant: boolean;
+    reason: string;
+    earlier_period: PeriodMetricsSchema;
+    later_period: PeriodMetricsSchema;
+}
+
+export interface CorrelatedGroupSchema {
+    group_id: string;
+    event_ids: number[];
+    temporal_spread_ms: number;
+    is_cross_sensor: boolean;
+    relative_source_hint?: string;
+}
+
+export interface TemporalPersistenceSchema {
+    is_persistent: boolean;
+    total_events: number;
+    anomalous_events: number;
+    anomaly_ratio: number;
+    window_duration_seconds: number;
 }
 
 export interface ZoneCorrelationResponse {
     zone_id: number;
-    is_persistent: boolean;
-    anomalous_events_count: number;
-    total_events_count: number;
-    correlated_groups: any[];
+    temporal_persistence: TemporalPersistenceSchema;
+    correlated_groups_count: number;
+    cross_sensor_groups_count: number;
+    correlated_groups: CorrelatedGroupSchema[];
+    note: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Telemetry                                                                  */
+/* -------------------------------------------------------------------------- */
 
 export interface TelemetryEventResult {
     event_id: number;
@@ -110,30 +179,80 @@ export interface ExtractedFeaturesSchema {
     sample_count: number;
 }
 
-export interface TelemetryLatestResponse {
+/**
+ * Response returned by:
+ * POST /api/v1/telemetry
+ *
+ * Contains the result of processing the submitted telemetry packet.
+ * Unlike TelemetryLatestResponse, this does not contain the bounded
+ * raw samples or detection threshold.
+ */
+export interface TelemetryIngestResponse {
     status: string;
     telemetry_accepted: boolean;
+
     sensor_id: string;
     zone_id: number;
     zone_name: string;
+
     timestamp: string;
     samples_count: number;
     sample_rate_hz: number;
     sequence?: number | null;
-    samples?: number[];
-    detection_threshold?: number | null;
+
     events_detected: number;
     events: TelemetryEventResult[];
+
     extracted_features?: ExtractedFeaturesSchema | null;
+
     temporal_persistence_confirmed?: boolean | null;
     cross_sensor_correlation_confirmed?: boolean | null;
+
     health_score?: number | null;
     health_status?: HealthStatus | null;
     health_trend?: string | null;
+
     alert_generated: boolean;
     alert_id?: number | null;
     alert_severity?: AlertSeverity | null;
     alert_title?: string | null;
+
+    message: string;
+}
+
+export interface TelemetryLatestResponse {
+    status: string;
+    telemetry_accepted: boolean;
+
+    sensor_id: string;
+    zone_id: number;
+    zone_name: string;
+
+    timestamp: string;
+    samples_count: number;
+    sample_rate_hz: number;
+    sequence?: number | null;
+
+    samples?: number[];
+    detection_threshold?: number | null;
+
+    events_detected: number;
+    events: TelemetryEventResult[];
+
+    extracted_features?: ExtractedFeaturesSchema | null;
+
+    temporal_persistence_confirmed?: boolean | null;
+    cross_sensor_correlation_confirmed?: boolean | null;
+
+    health_score?: number | null;
+    health_status?: HealthStatus | null;
+    health_trend?: string | null;
+
+    alert_generated: boolean;
+    alert_id?: number | null;
+    alert_severity?: AlertSeverity | null;
+    alert_title?: string | null;
+
     message: string;
 }
 
@@ -147,6 +266,10 @@ export interface TelemetryIngestRequest {
     detection_threshold?: number;
     session_id?: number;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Processing trace                                                           */
+/* -------------------------------------------------------------------------- */
 
 export interface TraceMetadata {
     trace_id: string;
@@ -312,6 +435,10 @@ export interface ProcessingTraceResponse {
     alert: AlertTrace;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Live telemetry                                                             */
+/* -------------------------------------------------------------------------- */
+
 export type LiveEventType =
     | "processing_started"
     | "stage_started"
@@ -342,23 +469,34 @@ export type LiveConnectionState =
 
 export interface LiveProcessingEvent {
     type: LiveEventType;
+
     trace_id?: string | null;
     event_id?: number | null;
+
     sensor_id?: string | null;
     zone_id?: number | null;
     zone_name?: string | null;
+
     stage?: ProcessingStage | null;
     stage_index?: number | null;
+
     status: string;
     timestamp: string;
+
     sequence?: number | null;
     duration_ms?: number | null;
+
     summary?: string | null;
     error_message?: string | null;
+
     metadata?: Record<string, any> | null;
 }
 
-export type LiveStageStatus = "pending" | "processing" | "completed" | "error";
+export type LiveStageStatus =
+    | "pending"
+    | "processing"
+    | "completed"
+    | "error";
 
 export interface LiveStageInfo {
     id: number;
