@@ -136,6 +136,25 @@ export default function CityMap() {
      */
     const [showDigitalTwin, setShowDigitalTwin] =
         useState(false);
+    const [initialTwinZoneId, setInitialTwinZoneId] =
+        useState<number | null>(null);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get("view") === "twin") {
+                setShowDigitalTwin(true);
+            }
+            const handleOpen = (e: any) => {
+                if (e.detail?.zoneId) {
+                    setInitialTwinZoneId(e.detail.zoneId);
+                }
+                setShowDigitalTwin(true);
+            };
+            window.addEventListener("aegis3d:open-digital-twin", handleOpen);
+            return () => window.removeEventListener("aegis3d:open-digital-twin", handleOpen);
+        }
+    }, []);
 
     /* ---------------------------------------------------------------------- */
     /* MAP INITIALIZATION                                                     */
@@ -1820,6 +1839,7 @@ export default function CityMap() {
 
             {showDigitalTwin && (
                 <DigitalTwinViewer
+                    initialZoneId={initialTwinZoneId}
                     onClose={() =>
                         setShowDigitalTwin(false)
                     }

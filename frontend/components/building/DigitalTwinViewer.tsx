@@ -11,6 +11,7 @@ import {
     ZoneHealthResponse,
     ZoneResponse,
 } from "@/types/api";
+import TelemetryHUD from "../dashboard/TelemetryHUD";
 
 /* =========================================================
    TYPES
@@ -430,12 +431,14 @@ export default function DigitalTwinViewer({
 
     const [zones, setZones] = useState<ZoneResponse[]>([]);
     const [alerts, setAlerts] = useState<AlertResponse[]>([]);
-
     const [zoneHealthMap, setZoneHealthMap] =
         useState<Record<number, ZoneHealthResponse>>({});
 
     const [activeZoneId, setActiveZoneId] =
         useState<number | null>(initialZoneId);
+
+    const [hudCollapsed, setHudCollapsed] =
+        useState<boolean>(false);
 
     const [loading, setLoading] =
         useState<boolean>(true);
@@ -446,6 +449,7 @@ export default function DigitalTwinViewer({
     // Load canonical mapping and live monitoring telemetry
     useEffect(() => {
         let isMounted = true;
+        let pollInterval: NodeJS.Timeout | null = null;
 
         async function initViewerData() {
             try {
@@ -513,6 +517,38 @@ export default function DigitalTwinViewer({
                     setAlerts(alertsData);
                     setZoneHealthMap(healthEntries);
                     setLoading(false);
+
+                    // 4. Start periodic background polling (every 1.5s) to reflect real-time simulator events
+                    pollInterval = setInterval(async () => {
+                        if (!isMounted) return;
+                        try {
+                            const [freshAlerts, freshZones] = await Promise.all([
+                                api.getAlerts().catch(() => []),
+                                api.getZones().catch(() => []),
+                            ]);
+                            const freshHealth: Record<number, ZoneHealthResponse> = {};
+                            const targetZones = freshZones.length > 0 ? freshZones : zonesData;
+                            await Promise.all(
+                                targetZones.map(async (z) => {
+                                    try {
+                                        const h = await api.getZoneHealth(z.id);
+                                        freshHealth[z.id] = h;
+                                    } catch {
+                                        // Ignore polling failures
+                                    }
+                                })
+                            );
+                            if (isMounted) {
+                                setAlerts(freshAlerts);
+                                if (freshZones.length > 0) setZones(freshZones);
+                                if (Object.keys(freshHealth).length > 0) {
+                                    setZoneHealthMap(freshHealth);
+                                }
+                            }
+                        } catch {
+                            // Non-blocking poll failure
+                        }
+                    }, 1500);
                 }
             } catch (err: any) {
                 if (isMounted) {
@@ -535,6 +571,7 @@ export default function DigitalTwinViewer({
 
         return () => {
             isMounted = false;
+            if (pollInterval) clearInterval(pollInterval);
         };
     }, []);
 
@@ -557,8 +594,8 @@ export default function DigitalTwinViewer({
                 inset: 0,
                 zIndex: 1000,
                 background: "#020617",
-                fontFamily:
-                    "system-ui, -apple-system, sans-serif",
+                fontFamily: "system-ui, -apple-system, sans-serif",
+                overflow: "hidden",
             }}
         >
             {/* =====================================================
@@ -651,13 +688,15 @@ export default function DigitalTwinViewer({
             ===================================================== */}
 
             <div
+                className="custom-scrollbar"
                 style={{
                     position: "absolute",
-                    top: 80,
+                    top: 76,
                     left: 20,
                     zIndex: 10,
                     width: 360,
-                    maxHeight: "calc(100vh - 180px)",
+                    maxWidth: "calc(100vw - 40px)",
+                    maxHeight: "calc(100dvh - 96px)",
                     overflowY: "auto",
                     background:
                         "rgba(15, 23, 42, 0.88)",
@@ -666,6 +705,7 @@ export default function DigitalTwinViewer({
                         "1px solid rgba(148, 163, 184, 0.2)",
                     borderRadius: 10,
                     padding: 16,
+                    paddingRight: 8,
                     color: "#f1f5f9",
                     boxShadow:
                         "0 20px 25px -5px rgba(0, 0, 0, 0.6)",
@@ -1080,6 +1120,35 @@ export default function DigitalTwinViewer({
                     localization.
                 </div>
             </div>
+
+            {/* =====================================================
+                RIGHT HUD: MISSION-CRITICAL TELEMETRY OPERATIONS
+            ===================================================== */}
+            <TelemetryHUD
+                activeZoneId={activeZoneId}
+                onSelectZone={(selectedId) => {
+                    const foundByBackend = mapping?.zones.find((mz) => {
+                        const bz = resolveBackendZone(mz, zones);
+                        return bz?.id === selectedId;
+                    });
+                    if (foundByBackend) {
+                        setActiveZoneId(foundByBackend.zone_id);
+                    } else {
+                        setActiveZoneId(selectedId);
+                    }
+                }}
+                onFocusAlert={(alert) => {
+                    const mZone = mapping?.zones.find((mz) => {
+                        const bz = resolveBackendZone(mz, zones);
+                        return bz?.id === alert.zone_id;
+                    });
+                    if (mZone) {
+                        setActiveZoneId(mZone.zone_id);
+                    }
+                }}
+                collapsed={hudCollapsed}
+                onToggleCollapse={() => setHudCollapsed(!hudCollapsed)}
+            />
 
             {/* =====================================================
                 3D CANVAS

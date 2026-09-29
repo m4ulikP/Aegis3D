@@ -125,3 +125,13 @@ class TelemetryIngestResponse(BaseModel):
     message: str
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class TelemetryLatestResponse(TelemetryIngestResponse):
+    """Latest ingested telemetry snapshot with bounded sample window for UI visualization."""
+
+    samples: List[float] = Field(
+        default_factory=list,
+        description="Bounded raw/filtered sample window for visual representation",
+    )
+    detection_threshold: Optional[float] = None
