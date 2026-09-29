@@ -12,7 +12,7 @@ class TraceMetadata(BaseModel):
 
     trace_id: str = Field(..., description="Unique identifier for the processing trace")
     event_id: Optional[int] = Field(None, description="Primary event database ID if an event was detected")
-    sensor_id: str = Field(..., description="Transducer/sensor identifier (e.g. 'PZT-Z1-01')")
+    sensor_id: str = Field(..., description="Transducer/sensor identifier (e.g. 'PZT-Z01')")
     zone_id: int = Field(..., description="Target structural monitoring zone ID")
     zone_name: str = Field(..., description="Target structural monitoring zone name")
     timestamp: datetime = Field(..., description="Acquisition timestamp in UTC")

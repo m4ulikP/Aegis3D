@@ -24,10 +24,18 @@ interface TelemetryHUDProps {
 
 const AVAILABLE_SENSORS = [
     { id: null, label: "Auto (Latest)" },
-    { id: "PZT-Z1-01", label: "PZT-Z1-01" },
-    { id: "PZT-Z1-02", label: "PZT-Z1-02" },
-    { id: "PZT-Z2-01", label: "PZT-Z2-01" },
-    { id: "PZT-Z2-02", label: "PZT-Z2-02" },
+    { id: "PZT-Z01", label: "PZT-Z01" },
+    { id: "PZT-Z02", label: "PZT-Z02" },
+    { id: "PZT-Z03", label: "PZT-Z03" },
+    { id: "PZT-Z04", label: "PZT-Z04" },
+    { id: "PZT-Z05", label: "PZT-Z05" },
+    { id: "PZT-Z06", label: "PZT-Z06" },
+    { id: "PZT-Z07", label: "PZT-Z07" },
+    { id: "PZT-Z08", label: "PZT-Z08" },
+    { id: "PZT-Z09", label: "PZT-Z09" },
+    { id: "PZT-Z10", label: "PZT-Z10" },
+    { id: "PZT-Z11", label: "PZT-Z11" },
+    { id: "PZT-Z12", label: "PZT-Z12" },
 ];
 
 export default function TelemetryHUD({
@@ -154,7 +162,7 @@ export default function TelemetryHUD({
         telemetry?.zone_name ||
         zones.find((z) => z.id === activeZoneId)?.name ||
         "Zone 1 - Main Deck Girder";
-    const currentSensorId = telemetry?.sensor_id || selectedSensorId || "PZT-Z1-01";
+    const currentSensorId = telemetry?.sensor_id || selectedSensorId || "PZT-Z01";
     const hasAnomaly = telemetry?.events.some((e) => e.is_anomalous) || false;
     const hasEvent = (telemetry?.events_detected || 0) > 0;
 

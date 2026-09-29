@@ -1,0 +1,25 @@
+{
+  "zone_id": 1,
+  "temporal_persistence": {
+    "is_persistent": true,
+    "total_events": 14,
+    "anomalous_events": 4,
+    "anomaly_ratio": 0.2857,
+    "window_duration_seconds": 300.0
+  },
+  "correlated_groups_count": 1,
+  "cross_sensor_groups_count": 1,
+  "correlated_groups": [
+    {
+      "group_id": "CORR-20260927-001",
+      "event_ids": [
+        101,
+        102
+      ],
+      "temporal_spread_ms": 1.5,
+      "is_cross_sensor": true,
+      "relative_source_hint": "Event arrived first at sensor PZT-01 (lead time: 1.50 ms relative to PZT-02)"
+    }
+  ],
+  "note": "Provides two-PZT relative source indication. Precise 2D/3D localization is not supported."
+}

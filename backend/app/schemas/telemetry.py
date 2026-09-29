@@ -15,7 +15,7 @@ class TelemetryIngestRequest(BaseModel):
         ...,
         min_length=1,
         max_length=255,
-        description="Stable sensor identifier (e.g. 'PZT-Z1-01', 'PZT-Z2-01')",
+        description="Canonical sensor identifier (e.g. 'PZT-Z01' … 'PZT-Z12')",
     )
     zone_name: str = Field(
         ...,

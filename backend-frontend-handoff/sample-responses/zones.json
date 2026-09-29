@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "name": "Zone 1 - North Wing",
+    "floor": "Floor 2",
+    "description": "Primary structural monitoring zone",
+    "created_at": "2026-09-27T10:13:13.156161Z"
+  },
+  {
+    "id": 2,
+    "name": "Zone 2 - South Wing",
+    "floor": "Floor 1",
+    "description": "Secondary monitoring zone",
+    "created_at": "2026-09-27T10:13:13.156161Z"
+  }
+]

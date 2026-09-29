@@ -1,0 +1,24 @@
+{
+  "zone_id": 1,
+  "overall_trend_direction": "STABLE",
+  "event_rate_change_ratio": 0.05,
+  "magnitude_delta": 0.12,
+  "is_statistically_significant": false,
+  "reason": "Anomaly rate and mean magnitude remain within stable baseline bounds",
+  "earlier_period": {
+    "total_events": 12,
+    "anomalous_events": 3,
+    "anomaly_rate": 0.25,
+    "mean_magnitude": 3.2,
+    "persistent_anomaly_count": 2,
+    "cross_sensor_event_count": 1
+  },
+  "later_period": {
+    "total_events": 14,
+    "anomalous_events": 4,
+    "anomaly_rate": 0.2857,
+    "mean_magnitude": 3.32,
+    "persistent_anomaly_count": 3,
+    "cross_sensor_event_count": 2
+  }
+}

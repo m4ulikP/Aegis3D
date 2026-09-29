@@ -271,14 +271,50 @@ class TelemetryService:
 
         raise ZoneNotFoundError(f"Zone '{zone_name}' not found")
 
+    # Canonical sensor → zone lookup.
+    # PZT-Z01…Z06 → Zone 1 (Main Deck Girder)
+    # PZT-Z07…Z12 → Zone 2 (Substructure Pier B)
+    _CANONICAL_SENSOR_ZONE_MAP: Dict[int, int] = {
+        **{n: 1 for n in range(1, 7)},
+        **{n: 2 for n in range(7, 13)},
+    }
+
     def validate_sensor_zone_consistency(self, sensor_id: str, zone: Zone) -> None:
-        """Verify that sensor identifier belongs to the resolved zone."""
+        """Verify that sensor identifier belongs to the resolved zone.
+
+        Two-path validation:
+        - Canonical format ``PZT-ZNN`` (e.g. PZT-Z01…PZT-Z12): checked via the
+          built-in _CANONICAL_SENSOR_ZONE_MAP so that PZT-Z07 correctly maps to
+          Zone 2 even though its numeric suffix (7) does not match "Zone 2".
+        - Legacy format ``PZT-Z<zone>-<node>`` (e.g. PZT-Z1-01): falls back to
+          the original regex-based zone number comparison.
+        """
+        # ── Canonical format: exactly PZT-Z followed by two digits ──────────
+        canonical_match = re.fullmatch(
+            r"PZT-Z(\d{2})", sensor_id, re.IGNORECASE
+        )
+        if canonical_match:
+            sensor_num = int(canonical_match.group(1))
+            expected_zone_num = self._CANONICAL_SENSOR_ZONE_MAP.get(sensor_num)
+            if expected_zone_num is not None:
+                zone_match = re.search(r"Zone\s*(\d+)", zone.name, re.IGNORECASE)
+                if zone_match:
+                    zone_num = int(zone_match.group(1))
+                    if expected_zone_num != zone_num:
+                        raise InconsistentSensorZoneError(
+                            f"Sensor '{sensor_id}' (canonical Zone {expected_zone_num}) "
+                            f"was submitted to '{zone.name}' (Zone {zone_num})"
+                        )
+            # Canonical sensor accepted even if zone number is not DB-registered
+            return
+
+        # ── Legacy format: PZT-Z<zone>-<node> or any other pattern ─────────
         sensor_match = re.search(r"Z(\d+)", sensor_id, re.IGNORECASE)
         if sensor_match:
-            sensor_zone_num = sensor_match.group(1)
+            sensor_zone_num = int(sensor_match.group(1))
             zone_match = re.search(r"Zone\s*(\d+)", zone.name, re.IGNORECASE)
             if zone_match:
-                zone_num = zone_match.group(1)
+                zone_num = int(zone_match.group(1))
                 if sensor_zone_num != zone_num:
                     raise InconsistentSensorZoneError(
                         f"Sensor '{sensor_id}' (Zone {sensor_zone_num}) is inconsistent with target zone '{zone.name}' (Zone {zone_num})"

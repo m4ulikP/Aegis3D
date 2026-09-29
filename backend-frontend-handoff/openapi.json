@@ -1,0 +1,1579 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Aegis3D Backend API",
+    "description": "Generic Structural Event & Health Monitoring Platform API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Liveness check endpoint.\n\nConfirms that the Aegis3D API process is alive.\nDoes not perform database or external queries.",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Check Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/db": {
+      "get": {
+        "summary": "Health Db Check",
+        "description": "Database readiness check endpoint.\n\nVerifies communication with PostgreSQL using the existing get_db persistence foundation.",
+        "operationId": "health_db_check_health_db_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Db Check Health Db Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events": {
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Create Event",
+        "description": "Create and persist a new generic structural observation event.",
+        "operationId": "create_event_api_v1_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Get Event",
+        "description": "Retrieve a structural observation event by ID.",
+        "operationId": "get_event_api_v1_events__event_id__get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/zones": {
+      "get": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "List Zones",
+        "description": "Return all monitoring zones.",
+        "operationId": "list_zones_api_v1_zones_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ZoneResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Zones Api V1 Zones Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/zones/{zone_id}": {
+      "get": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "Get Zone Detail",
+        "description": "Return specific zone and its monitoring metadata.",
+        "operationId": "get_zone_detail_api_v1_zones__zone_id__get",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Zone Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/zones/{zone_id}/events": {
+      "get": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "Get Zone Events",
+        "description": "Return events associated with a zone.",
+        "operationId": "get_zone_events_api_v1_zones__zone_id__events_get",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Zone Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Max number of events to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Max number of events to return"
+          },
+          {
+            "name": "start_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start timestamp filter",
+              "title": "Start Time"
+            },
+            "description": "Start timestamp filter"
+          },
+          {
+            "name": "end_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End timestamp filter",
+              "title": "End Time"
+            },
+            "description": "End timestamp filter"
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EventSeverity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Event severity filter",
+              "title": "Severity"
+            },
+            "description": "Event severity filter"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EventStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Event status filter",
+              "title": "Status"
+            },
+            "description": "Event status filter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventResponse"
+                  },
+                  "title": "Response Get Zone Events Api V1 Zones  Zone Id  Events Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/zones/{zone_id}/health": {
+      "get": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "Get Zone Health",
+        "description": "Return the latest Structural Health Indicator information for a zone.",
+        "operationId": "get_zone_health_api_v1_zones__zone_id__health_get",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Zone Id"
+            }
+          },
+          {
+            "name": "reference_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Reference end time for health evaluation",
+              "title": "Reference Time"
+            },
+            "description": "Reference end time for health evaluation"
+          },
+          {
+            "name": "window_duration_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 86400.0,
+              "minimum": 60.0,
+              "description": "Analysis window in seconds",
+              "default": 3600.0,
+              "title": "Window Duration Seconds"
+            },
+            "description": "Analysis window in seconds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneHealthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/zones/{zone_id}/trend": {
+      "get": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "Get Zone Trend",
+        "description": "Expose deterministic trend analysis service for a zone.",
+        "operationId": "get_zone_trend_api_v1_zones__zone_id__trend_get",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Zone Id"
+            }
+          },
+          {
+            "name": "reference_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Reference end time for trend evaluation",
+              "title": "Reference Time"
+            },
+            "description": "Reference end time for trend evaluation"
+          },
+          {
+            "name": "analysis_window_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 86400.0,
+              "minimum": 60.0,
+              "description": "Analysis window in seconds",
+              "default": 3600.0,
+              "title": "Analysis Window Seconds"
+            },
+            "description": "Analysis window in seconds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneTrendResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/zones/{zone_id}/correlation": {
+      "get": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "Get Zone Correlation",
+        "description": "Expose temporal persistence and two-PZT cross-sensor correlation for a zone.",
+        "operationId": "get_zone_correlation_api_v1_zones__zone_id__correlation_get",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Zone Id"
+            }
+          },
+          {
+            "name": "reference_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Reference end time for correlation evaluation",
+              "title": "Reference Time"
+            },
+            "description": "Reference end time for correlation evaluation"
+          },
+          {
+            "name": "window_duration_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 3600.0,
+              "minimum": 10.0,
+              "description": "Persistence window in seconds",
+              "default": 300.0,
+              "title": "Window Duration Seconds"
+            },
+            "description": "Persistence window in seconds"
+          },
+          {
+            "name": "tolerance_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 1.0,
+              "minimum": 0.001,
+              "description": "Cross-sensor tolerance in seconds",
+              "default": 0.025,
+              "title": "Tolerance Seconds"
+            },
+            "description": "Cross-sensor tolerance in seconds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneCorrelationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "List Alerts",
+        "description": "Return actionable system alerts with optional filtering.",
+        "operationId": "list_alerts_api_v1_alerts_get",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional zone ID filter",
+              "title": "Zone Id"
+            },
+            "description": "Optional zone ID filter"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AlertStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional alert status filter",
+              "title": "Status"
+            },
+            "description": "Optional alert status filter"
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AlertSeverity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional alert severity filter",
+              "title": "Severity"
+            },
+            "description": "Optional alert severity filter"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Max number of alerts to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Max number of alerts to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AlertResponse"
+                  },
+                  "title": "Response List Alerts Api V1 Alerts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/summary": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Get Health Summary",
+        "description": "Return dashboard-level structural health monitoring summary.",
+        "operationId": "get_health_summary_api_v1_health_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthSummaryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AlertResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "health_snapshot_id": {
+            "type": "integer",
+            "title": "Health Snapshot Id"
+          },
+          "zone_id": {
+            "type": "integer",
+            "title": "Zone Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/AlertSeverity"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AlertStatus"
+          },
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "health_snapshot_id",
+          "zone_id",
+          "timestamp",
+          "severity",
+          "title",
+          "message",
+          "status"
+        ],
+        "title": "AlertResponse",
+        "description": "Schema for returning an actionable alert instance."
+      },
+      "AlertSeverity": {
+        "type": "string",
+        "enum": [
+          "LOW",
+          "MEDIUM",
+          "HIGH",
+          "CRITICAL"
+        ],
+        "title": "AlertSeverity"
+      },
+      "AlertStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "ACKNOWLEDGED",
+          "RESOLVED"
+        ],
+        "title": "AlertStatus"
+      },
+      "CorrelatedGroupSchema": {
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "title": "Group Id"
+          },
+          "event_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Event Ids"
+          },
+          "temporal_spread_ms": {
+            "type": "number",
+            "title": "Temporal Spread Ms"
+          },
+          "is_cross_sensor": {
+            "type": "boolean",
+            "title": "Is Cross Sensor"
+          },
+          "relative_source_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relative Source Hint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "group_id",
+          "event_ids",
+          "temporal_spread_ms",
+          "is_cross_sensor"
+        ],
+        "title": "CorrelatedGroupSchema",
+        "description": "Sub-schema for a two-PZT correlated event group."
+      },
+      "EventCreate": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Session Id",
+            "description": "ID of the associated monitoring session"
+          },
+          "zone_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Zone Id",
+            "description": "ID of the associated zone"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/EventSourceType",
+            "description": "Source type of observation (SIMULATOR, SENSOR, IMPORTED)"
+          },
+          "source_id": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Source Id",
+            "description": "Generic source identifier (e.g. SIM-01, PZT-01)"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id",
+            "description": "Optional correlation identifier across multiple sources"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "Timestamp of observation"
+          },
+          "magnitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Magnitude",
+            "description": "Event magnitude physical measurement (>= 0)"
+          },
+          "energy": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Energy",
+            "description": "Event energy measurement (>= 0)"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms",
+            "description": "Event duration in milliseconds (>= 0)"
+          },
+          "frequency_hz": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Hz",
+            "description": "Event frequency in Hz (>= 0)"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/EventSeverity",
+            "description": "Observation severity rating",
+            "default": "LOW"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus",
+            "description": "Observation status",
+            "default": "DETECTED"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Arbitrary metadata payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "zone_id",
+          "source_type",
+          "source_id",
+          "timestamp"
+        ],
+        "title": "EventCreate",
+        "description": "Schema for creating a generic structural event observation."
+      },
+      "EventResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "zone_id": {
+            "type": "integer",
+            "title": "Zone Id"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/EventSourceType"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "magnitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Magnitude"
+          },
+          "energy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Energy"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "frequency_hz": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Hz"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/EventSeverity"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "session_id",
+          "zone_id",
+          "source_type",
+          "source_id",
+          "timestamp",
+          "severity",
+          "status"
+        ],
+        "title": "EventResponse",
+        "description": "Schema for returning a structural event observation."
+      },
+      "EventSeverity": {
+        "type": "string",
+        "enum": [
+          "LOW",
+          "MEDIUM",
+          "HIGH",
+          "CRITICAL"
+        ],
+        "title": "EventSeverity"
+      },
+      "EventSourceType": {
+        "type": "string",
+        "enum": [
+          "SIMULATOR",
+          "SENSOR",
+          "IMPORTED"
+        ],
+        "title": "EventSourceType"
+      },
+      "EventStatus": {
+        "type": "string",
+        "enum": [
+          "DETECTED",
+          "REVIEWED",
+          "DISMISSED"
+        ],
+        "title": "EventStatus"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthStatus": {
+        "type": "string",
+        "enum": [
+          "NORMAL",
+          "MONITOR",
+          "INSPECTION_ADVISED",
+          "HIGH_PRIORITY_INSPECTION"
+        ],
+        "title": "HealthStatus"
+      },
+      "HealthSummaryResponse": {
+        "properties": {
+          "total_zones": {
+            "type": "integer",
+            "title": "Total Zones"
+          },
+          "health_status_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Health Status Counts"
+          },
+          "active_alerts_count": {
+            "type": "integer",
+            "title": "Active Alerts Count"
+          },
+          "recent_events_count": {
+            "type": "integer",
+            "title": "Recent Events Count"
+          },
+          "latest_timestamp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_zones",
+          "health_status_counts",
+          "active_alerts_count",
+          "recent_events_count"
+        ],
+        "title": "HealthSummaryResponse",
+        "description": "Schema for high-level dashboard monitoring health summary."
+      },
+      "HealthTrend": {
+        "type": "string",
+        "enum": [
+          "STABLE",
+          "INCREASING",
+          "DECREASING"
+        ],
+        "title": "HealthTrend"
+      },
+      "PeriodMetricsSchema": {
+        "properties": {
+          "total_events": {
+            "type": "integer",
+            "title": "Total Events"
+          },
+          "anomalous_events": {
+            "type": "integer",
+            "title": "Anomalous Events"
+          },
+          "anomaly_rate": {
+            "type": "number",
+            "title": "Anomaly Rate"
+          },
+          "mean_magnitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Magnitude",
+            "default": 0.0
+          },
+          "persistent_anomaly_count": {
+            "type": "integer",
+            "title": "Persistent Anomaly Count"
+          },
+          "cross_sensor_event_count": {
+            "type": "integer",
+            "title": "Cross Sensor Event Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_events",
+          "anomalous_events",
+          "anomaly_rate",
+          "persistent_anomaly_count",
+          "cross_sensor_event_count"
+        ],
+        "title": "PeriodMetricsSchema",
+        "description": "Sub-schema for trend metrics during a specific analysis sub-period."
+      },
+      "TemporalPersistenceSchema": {
+        "properties": {
+          "is_persistent": {
+            "type": "boolean",
+            "title": "Is Persistent"
+          },
+          "total_events": {
+            "type": "integer",
+            "title": "Total Events"
+          },
+          "anomalous_events": {
+            "type": "integer",
+            "title": "Anomalous Events"
+          },
+          "anomaly_ratio": {
+            "type": "number",
+            "title": "Anomaly Ratio"
+          },
+          "window_duration_seconds": {
+            "type": "number",
+            "title": "Window Duration Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_persistent",
+          "total_events",
+          "anomalous_events",
+          "anomaly_ratio",
+          "window_duration_seconds"
+        ],
+        "title": "TemporalPersistenceSchema",
+        "description": "Sub-schema for temporal persistence evaluation metrics."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ZoneCorrelationResponse": {
+        "properties": {
+          "zone_id": {
+            "type": "integer",
+            "title": "Zone Id"
+          },
+          "temporal_persistence": {
+            "$ref": "#/components/schemas/TemporalPersistenceSchema"
+          },
+          "correlated_groups_count": {
+            "type": "integer",
+            "title": "Correlated Groups Count"
+          },
+          "cross_sensor_groups_count": {
+            "type": "integer",
+            "title": "Cross Sensor Groups Count"
+          },
+          "correlated_groups": {
+            "items": {
+              "$ref": "#/components/schemas/CorrelatedGroupSchema"
+            },
+            "type": "array",
+            "title": "Correlated Groups"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": "Provides two-PZT relative source indication. Precise 2D/3D localization is not supported."
+          }
+        },
+        "type": "object",
+        "required": [
+          "zone_id",
+          "temporal_persistence",
+          "correlated_groups_count",
+          "cross_sensor_groups_count",
+          "correlated_groups"
+        ],
+        "title": "ZoneCorrelationResponse",
+        "description": "Schema for zone temporal persistence and cross-sensor correlation results."
+      },
+      "ZoneDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "event_count": {
+            "type": "integer",
+            "title": "Event Count",
+            "default": 0
+          },
+          "active_alert_count": {
+            "type": "integer",
+            "title": "Active Alert Count",
+            "default": 0
+          },
+          "latest_health_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HealthStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "created_at"
+        ],
+        "title": "ZoneDetailResponse",
+        "description": "Schema for detailed Zone metadata including counts and status."
+      },
+      "ZoneHealthResponse": {
+        "properties": {
+          "zone_id": {
+            "type": "integer",
+            "title": "Zone Id"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "status": {
+            "$ref": "#/components/schemas/HealthStatus"
+          },
+          "trend": {
+            "$ref": "#/components/schemas/HealthTrend"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer",
+            "default": "SHI is a prototype evidence-based monitoring indicator derived from observed signal/event behavior. It is not a certified structural safety score and does not independently establish structural damage or failure."
+          }
+        },
+        "type": "object",
+        "required": [
+          "zone_id",
+          "score",
+          "status",
+          "trend",
+          "reason",
+          "timestamp"
+        ],
+        "title": "ZoneHealthResponse",
+        "description": "Schema for Structural Health Indicator response for a zone."
+      },
+      "ZoneResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "created_at"
+        ],
+        "title": "ZoneResponse",
+        "description": "Schema for basic Zone information."
+      },
+      "ZoneTrendResponse": {
+        "properties": {
+          "zone_id": {
+            "type": "integer",
+            "title": "Zone Id"
+          },
+          "overall_trend_direction": {
+            "type": "string",
+            "title": "Overall Trend Direction"
+          },
+          "event_rate_change_ratio": {
+            "type": "number",
+            "title": "Event Rate Change Ratio"
+          },
+          "magnitude_delta": {
+            "type": "number",
+            "title": "Magnitude Delta"
+          },
+          "is_statistically_significant": {
+            "type": "boolean",
+            "title": "Is Statistically Significant"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "earlier_period": {
+            "$ref": "#/components/schemas/PeriodMetricsSchema"
+          },
+          "later_period": {
+            "$ref": "#/components/schemas/PeriodMetricsSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "zone_id",
+          "overall_trend_direction",
+          "event_rate_change_ratio",
+          "magnitude_delta",
+          "is_statistically_significant",
+          "reason",
+          "earlier_period",
+          "later_period"
+        ],
+        "title": "ZoneTrendResponse",
+        "description": "Schema for zone trend analysis results."
+      }
+    }
+  }
+}

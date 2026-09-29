@@ -4099,7 +4099,7 @@ export default function TelemetryProcessingInspector({
         liveEvent?.sensor_id ||
         trace?.metadata.sensor_id ||
         telemetry?.sensor_id ||
-        "PZT-Z1-01";
+        "PZT-Z01";
     const currentZoneName = trace?.metadata.zone_name || telemetry?.zone_name || "Zone 1 - Main Deck Girder";
 
     return (

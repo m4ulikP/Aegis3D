@@ -149,8 +149,8 @@ def generate_correlated_pair(
     Generate a synchronized pair of representative signals for two PZT sensors in the same zone.
 
     Simulates a mechanical stress wave propagating through a structural member:
-    - Sensor 1 (e.g. PZT-Z1-01, nearer sensor): detects the primary burst wave first.
-    - Sensor 2 (e.g. PZT-Z1-02, downstream sensor): detects the burst wave delayed by tdoa_seconds
+    - Sensor 1 (e.g. PZT-Z01, nearer sensor): detects the primary burst wave first.
+    - Sensor 2 (e.g. PZT-Z02, downstream sensor): detects the burst wave delayed by tdoa_seconds
       with physical geometric attenuation.
 
     Args:

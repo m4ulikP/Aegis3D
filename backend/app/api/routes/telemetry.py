@@ -125,7 +125,7 @@ def get_processing_trace(
 
     Identifier parameter supports:
     - An Event ID (e.g. '42')
-    - A Sensor ID (e.g. 'PZT-Z1-01')
+    - A Sensor ID (e.g. 'PZT-Z01')
     - A Trace ID (e.g. 'trace-evt-42')
     - 'latest' for the most recently processed telemetry
     """
@@ -144,7 +144,7 @@ def get_processing_trace(
 def get_latest_telemetry(
     sensor_id: Optional[str] = Query(
         None,
-        description="Optional sensor identifier filter (e.g. 'PZT-Z1-01'). If omitted, returns latest packet from most recent sensor.",
+        description="Optional sensor identifier filter (e.g. 'PZT-Z01'). If omitted, returns latest packet from most recent sensor.",
     )
 ) -> Optional[TelemetryLatestResponse]:
     """

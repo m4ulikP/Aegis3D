@@ -116,7 +116,7 @@ def test_event_bus_broadcast_to_multiple_subscribers():
     event = LiveProcessingEvent(
         type=LiveEventType.PROCESSING_STARTED,
         trace_id="trace-test-01",
-        sensor_id="PZT-Z1-01",
+        sensor_id="PZT-Z01",
         status="started",
         timestamp=datetime.now(timezone.utc),
     )
@@ -172,7 +172,7 @@ def test_pipeline_stage_ordering_on_ingest(db_session: Session, seeded_context):
         samples[i] = 4.5
 
     payload = TelemetryIngestRequest(
-        sensor_id="PZT-Z1-01",
+        sensor_id="PZT-Z01",
         zone_name="Zone 1 - Main Deck Girder",
         sample_rate_hz=1000.0,
         samples=samples,
@@ -195,7 +195,7 @@ def test_pipeline_stage_ordering_on_ingest(db_session: Session, seeded_context):
 
     # 1. First event is PROCESSING_STARTED
     assert events[0].type == LiveEventType.PROCESSING_STARTED
-    assert events[0].sensor_id == "PZT-Z1-01"
+    assert events[0].sensor_id == "PZT-Z01"
 
     # 2. Check stage ordering: verify that each of the 9 stages appears in STAGE_ORDER
     stage_events = [e for e in events if e.stage is not None]
@@ -221,7 +221,7 @@ def test_pipeline_quiet_packet_stage_emission(db_session: Session, seeded_contex
     # Quiet samples well below detection threshold
     samples = [0.01, -0.01, 0.02, 0.0, -0.02] * 20
     payload = TelemetryIngestRequest(
-        sensor_id="PZT-Z1-01",
+        sensor_id="PZT-Z01",
         zone_name="Zone 1 - Main Deck Girder",
         sample_rate_hz=1000.0,
         samples=samples,
@@ -241,7 +241,7 @@ def test_pipeline_quiet_packet_stage_emission(db_session: Session, seeded_contex
 
     assert events[0].type == LiveEventType.PROCESSING_STARTED
     assert events[-1].type == LiveEventType.PROCESSING_COMPLETED
-    assert events[-1].trace_id.startswith("trace-PZT-Z1-01-101")
+    assert events[-1].trace_id.startswith("trace-PZT-Z01-101")
 
 
 def test_pipeline_error_emission(db_session: Session):
@@ -252,7 +252,7 @@ def test_pipeline_error_emission(db_session: Session):
 
     service = TelemetryService(db_session)
     payload = TelemetryIngestRequest(
-        sensor_id="PZT-Z1-01",
+        sensor_id="PZT-Z01",
         zone_name="Nonexistent Zone 999",
         sample_rate_hz=1000.0,
         samples=[1.0, 2.0],

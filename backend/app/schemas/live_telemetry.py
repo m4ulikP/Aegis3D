@@ -56,7 +56,7 @@ class LiveProcessingEvent(BaseModel):
     type: LiveEventType = Field(..., description="Classification of the live event")
     trace_id: Optional[str] = Field(None, description="Authoritative or preliminary processing trace identifier")
     event_id: Optional[int] = Field(None, description="Database event ID if detected and persisted")
-    sensor_id: Optional[str] = Field(None, description="Sensor identifier (e.g. PZT-Z1-01)")
+    sensor_id: Optional[str] = Field(None, description="Sensor identifier (e.g. PZT-Z01)")
     zone_id: Optional[int] = Field(None, description="Logical monitoring zone database ID")
     zone_name: Optional[str] = Field(None, description="Logical monitoring zone name")
     stage: Optional[ProcessingStage] = Field(None, description="Active processing stage if applicable")
