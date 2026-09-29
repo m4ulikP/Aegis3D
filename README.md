@@ -179,7 +179,7 @@ The backend processing engine and authoritative trace assemble complete evidence
 
 Aegis3D supports multi-sensor acoustic wave arrival correlation:
 - **TDOA Relationship**: Calculates arrival time delta ($\Delta t = |t_2 - t_1|$) for events detected across paired sensors within a 25 ms coincidence window.
-- **Relative Source Indication**: Determines relative wavefront arrival lead/lag (e.g., `"Event arrived first at sensor PZT-Z1-01 (lead time: 4.20 ms relative to PZT-Z1-02)"`).
+- **Relative Source Indication**: Determines relative wavefront arrival lead/lag (e.g., `"Event arrived first at sensor PZT-Z05 (lead time: 4.20 ms relative to PZT-Z06)"`).
 
 > **Explicit Non-Localization Note**: Two-PZT correlation indicates **relative arrival precedence along a 1D path between two sensors**. It does **NOT** compute 2D/3D physical coordinates, trilateration, or crack geometric coordinates.
 
@@ -259,7 +259,7 @@ Laptop 2 does **not** need the database or frontend. It only requires Python to 
 2. Run the virtual PZT sensor simulator targeting Laptop 1:
    ```bash
    cd simulator
-   python main.py --mode anomaly --sensor PZT-Z1-01 --backend-url http://<LAPTOP-1-IP>:8000 --batches 1
+   python main.py --mode anomaly --sensor PZT-Z01 --backend-url http://<LAPTOP-1-IP>:8000 --batches 1
    ```
 3. Observe on Laptop 1:
    - Backend processes the batch in ~10 ms and emits real SSE events.
@@ -306,7 +306,7 @@ Dashboard is accessible at [http://localhost:3000/dashboard](http://localhost:30
 ### 5. Run a Simulator Packet
 ```bash
 cd simulator
-python main.py --mode anomaly --sensor PZT-Z1-01 --backend-url http://localhost:8000 --batches 1
+python main.py --mode anomaly --sensor PZT-Z01 --backend-url http://localhost:8000 --batches 1
 ```
 
 ---

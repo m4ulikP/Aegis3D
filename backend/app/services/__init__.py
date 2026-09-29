@@ -9,6 +9,11 @@ from app.services.event_service import (
 )
 from app.services.health_service import HealthService
 from app.services.monitoring_service import MonitoringService
+from app.services.sensor_registry import (
+    CanonicalSensorMetadata,
+    SensorRegistryService,
+    get_sensor_registry,
+)
 from app.services.telemetry_service import (
     InconsistentSensorZoneError,
     TelemetryService,
@@ -28,5 +33,8 @@ __all__ = [
     "MonitoringService",
     "TelemetryService",
     "InconsistentSensorZoneError",
+    "SensorRegistryService",
+    "CanonicalSensorMetadata",
+    "get_sensor_registry",
 ]
 

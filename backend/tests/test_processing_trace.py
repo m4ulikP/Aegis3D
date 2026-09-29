@@ -125,7 +125,7 @@ def test_get_processing_trace_quiet_normal_telemetry(
     samples = (np.random.RandomState(42).normal(0.0, 0.05, 500)).tolist()
 
     payload = {
-        "sensor_id": "PZT-Z01",
+        "sensor_id": "PZT-Z05",
         "zone_name": seeded_context["zone1_name"],
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "sample_rate_hz": 1000.0,
@@ -145,7 +145,7 @@ def test_get_processing_trace_quiet_normal_telemetry(
     trace = trace_resp.json()
 
     # Verify Metadata
-    assert trace["metadata"]["sensor_id"] == "PZT-Z01"
+    assert trace["metadata"]["sensor_id"] == "PZT-Z05"
     assert trace["metadata"]["zone_id"] == seeded_context["zone1_id"]
     assert trace["metadata"]["sequence"] == 10
     assert trace["metadata"]["sample_rate_hz"] == 1000.0
@@ -153,7 +153,7 @@ def test_get_processing_trace_quiet_normal_telemetry(
     assert trace["metadata"]["event_id"] is None
 
     # Verify Ingestion
-    assert trace["ingestion"]["sensor_id"] == "PZT-Z01"
+    assert trace["ingestion"]["sensor_id"] == "PZT-Z05"
     assert len(trace["ingestion"]["samples_bounded"]) == 500
     assert trace["ingestion"]["peak_amplitude"] > 0.0
 
@@ -191,7 +191,7 @@ def test_get_processing_trace_quiet_normal_telemetry(
     assert trace["alert"]["alert_generated"] is False
 
     # Also check retrieval by sensor_id
-    trace_sensor = client.get("/api/v1/telemetry/PZT-Z01/processing-trace").json()
+    trace_sensor = client.get("/api/v1/telemetry/PZT-Z05/processing-trace").json()
     assert trace_sensor["metadata"]["trace_id"] == trace["metadata"]["trace_id"]
 
 
@@ -205,7 +205,7 @@ def test_get_processing_trace_burst_signal_anomaly_and_alert(
     samples[300:400] = 5.0 * np.sin(2 * np.pi * 100 * t)
 
     payload = {
-        "sensor_id": "PZT-Z01",
+        "sensor_id": "PZT-Z05",
         "zone_name": seeded_context["zone1_name"],
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "sample_rate_hz": 1000.0,
@@ -228,7 +228,7 @@ def test_get_processing_trace_burst_signal_anomaly_and_alert(
 
     # Metadata
     assert trace["metadata"]["event_id"] == event_id
-    assert trace["metadata"]["sensor_id"] == "PZT-Z01"
+    assert trace["metadata"]["sensor_id"] == "PZT-Z05"
     assert trace["metadata"]["sequence"] == 101
 
     # Ingestion & Conditioning
@@ -276,7 +276,7 @@ def test_get_processing_trace_cross_sensor_correlation(
     s1 = np.zeros(500)
     s1[100:150] = 3.5 * np.sin(2 * np.pi * 120 * t)
     p1 = {
-        "sensor_id": "PZT-Z07",
+        "sensor_id": "PZT-Z01",
         "zone_name": seeded_context["zone2_name"],
         "timestamp": now.isoformat(),
         "sample_rate_hz": 1000.0,
@@ -291,7 +291,7 @@ def test_get_processing_trace_cross_sensor_correlation(
     s2 = np.zeros(500)
     s2[100:150] = 3.2 * np.sin(2 * np.pi * 120 * t)
     p2 = {
-        "sensor_id": "PZT-Z08",
+        "sensor_id": "PZT-Z02",
         "zone_name": seeded_context["zone2_name"],
         "timestamp": now.isoformat(),
         "sample_rate_hz": 1000.0,
@@ -302,17 +302,17 @@ def test_get_processing_trace_cross_sensor_correlation(
     r2 = client.post("/api/v1/telemetry", json=p2)
     assert r2.status_code == 200
 
-    # 3. Retrieve trace for latest telemetry (PZT-Z08)
+    # 3. Retrieve trace for latest telemetry (PZT-Z02)
     trace_resp = client.get("/api/v1/telemetry/latest/processing-trace")
     assert trace_resp.status_code == 200
     trace = trace_resp.json()
 
-    assert trace["metadata"]["sensor_id"] == "PZT-Z08"
+    assert trace["metadata"]["sensor_id"] == "PZT-Z02"
     assert trace["correlation"]["evaluated"] is True
     assert trace["correlation"]["is_cross_sensor_correlated"] is True
     assert len(trace["correlation"]["participating_sensors"]) >= 2
-    assert "PZT-Z07" in trace["correlation"]["participating_sensors"]
-    assert "PZT-Z08" in trace["correlation"]["participating_sensors"]
+    assert "PZT-Z01" in trace["correlation"]["participating_sensors"]
+    assert "PZT-Z02" in trace["correlation"]["participating_sensors"]
 
 
 def test_get_processing_trace_reconstruction_from_database_after_cache_cleared(
@@ -324,7 +324,7 @@ def test_get_processing_trace_reconstruction_from_database_after_cache_cleared(
     samples[100:150] = 4.0 * np.sin(2 * np.pi * 100 * t)
 
     payload = {
-        "sensor_id": "PZT-Z01",
+        "sensor_id": "PZT-Z05",
         "zone_name": seeded_context["zone1_name"],
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "sample_rate_hz": 1000.0,
@@ -347,7 +347,7 @@ def test_get_processing_trace_reconstruction_from_database_after_cache_cleared(
     trace = trace_resp.json()
 
     assert trace["metadata"]["event_id"] == event_id
-    assert trace["metadata"]["sensor_id"] == "PZT-Z01"
+    assert trace["metadata"]["sensor_id"] == "PZT-Z05"
     assert trace["metadata"]["sequence"] == 77
     assert trace["features"]["peak_amplitude"] > 3.0
     assert trace["anomaly"]["evaluated"] is True
@@ -363,7 +363,7 @@ def test_processing_trace_is_read_only_and_does_not_mutate_state(
     samples[100:150] = 3.0 * np.sin(2 * np.pi * 100 * t)
 
     payload = {
-        "sensor_id": "PZT-Z01",
+        "sensor_id": "PZT-Z05",
         "zone_name": seeded_context["zone1_name"],
         "sample_rate_hz": 1000.0,
         "sequence": 88,

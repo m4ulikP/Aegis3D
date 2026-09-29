@@ -25,7 +25,7 @@ Running the seed command creates the following domain entities using existing ap
 
 ### Demo Anomaly & Correlation Highlights in Zone 1:
 - **Rule-Based Anomalies**: 4 recent events exceed baseline z-score threshold ($|z| > 3.0\sigma$).
-- **2-PZT Cross-Sensor Correlation**: Events `A1` and `A2` occur across sensors `PZT-Z1-01` and `PZT-Z1-02` within a 15ms window (triggers 2-PZT cross-sensor correlation).
+- **2-PZT Cross-Sensor Correlation**: Events `A1` and `A2` occur across sensors `PZT-Z05` and `PZT-Z06` within a 15ms window (triggers 2-PZT cross-sensor correlation).
 - **Temporal Persistence**: Multiple anomalous observations occur within the 5-minute persistence window.
 - **Structural Health Indicator (SHI)**: Evaluates reduced health score reflecting recent acoustic emission anomalies.
 

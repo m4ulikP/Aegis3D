@@ -100,7 +100,7 @@ def seeded_context_fixture(db_session: Session):
 
 def test_integration_normal_telemetry_flow(client: TestClient, seeded_context: dict):
     """Verify normal simulator payload results in PROCESSED_NO_EVENT on backend."""
-    sensor = VirtualPZTSensor(sensor_id="PZT-Z01", zone_name=seeded_context["zone1_name"])
+    sensor = VirtualPZTSensor(sensor_id="PZT-Z05", zone_name=seeded_context["zone1_name"])
     payload = sensor.generate_payload(mode="normal", sample_count=500, seed=42)
 
     # Confirm simulator does NOT include decision fields
@@ -119,7 +119,7 @@ def test_integration_normal_telemetry_flow(client: TestClient, seeded_context: d
 
 def test_integration_anomaly_telemetry_flow(client: TestClient, seeded_context: dict):
     """Verify anomaly simulator payload results in PROCESSED_ANOMALY_DETECTED on backend."""
-    sensor = VirtualPZTSensor(sensor_id="PZT-Z01", zone_name=seeded_context["zone1_name"])
+    sensor = VirtualPZTSensor(sensor_id="PZT-Z05", zone_name=seeded_context["zone1_name"])
     payload = sensor.generate_payload(mode="anomaly", sample_count=1000, seed=42)
 
     response = client.post("/api/v1/telemetry", json=payload)
@@ -135,9 +135,9 @@ def test_integration_anomaly_telemetry_flow(client: TestClient, seeded_context: 
 
 
 def test_integration_two_sensor_correlation_flow(client: TestClient, seeded_context: dict):
-    """Verify coordinated signals from PZT-Z01 and PZT-Z02 trigger cross-sensor correlation."""
-    sensor1 = VirtualPZTSensor(sensor_id="PZT-Z01", zone_name=seeded_context["zone1_name"])
-    sensor2 = VirtualPZTSensor(sensor_id="PZT-Z02", zone_name=seeded_context["zone1_name"])
+    """Verify coordinated signals from PZT-Z05 and PZT-Z06 trigger cross-sensor correlation."""
+    sensor1 = VirtualPZTSensor(sensor_id="PZT-Z05", zone_name=seeded_context["zone1_name"])
+    sensor2 = VirtualPZTSensor(sensor_id="PZT-Z06", zone_name=seeded_context["zone1_name"])
 
     # Generate physically related signals (5ms TDOA)
     s1, s2, _ = generate_correlated_pair(

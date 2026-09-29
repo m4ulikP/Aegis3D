@@ -32,6 +32,14 @@ OUTPUT_PATH = (
     / "sensor_registry.json"
 )
 
+ZONE_MAPPING_PATH = (
+    PROJECT_ROOT
+    / "data"
+    / "processed"
+    / "bim"
+    / "zone_bim_mapping.json"
+)
+
 TARGET_STOREYS = [
     "01 - Entry Level",
     "02 - Floor",
@@ -98,6 +106,15 @@ def select_spatially_distributed(
 def main() -> None:
     model = StructuralModel()
 
+    storey_to_zone = {}
+    if ZONE_MAPPING_PATH.exists():
+        with ZONE_MAPPING_PATH.open("r", encoding="utf-8") as f:
+            zone_map = json.load(f)
+            for z in zone_map.get("zones", []):
+                s_name = z.get("mapping_rule", {}).get("storey_name")
+                if s_name:
+                    storey_to_zone[s_name] = (z.get("zone_id"), z.get("zone_name"))
+
     sensors = []
 
     sensor_number = 1
@@ -115,6 +132,7 @@ def main() -> None:
         )
 
         for component in selected:
+            zone_info = storey_to_zone.get(component.storey, (None, None))
             sensors.append(
                 {
                     "sensor_id": f"PZT-Z{sensor_number:02d}",
@@ -122,6 +140,8 @@ def main() -> None:
                     "component_type": component.ifc_type,
                     "component_name": component.name,
                     "storey": component.storey,
+                    "zone_id": zone_info[0],
+                    "zone_name": zone_info[1],
                     "position": list(component.center),
                     "role": "receiver",
                     "status": "NORMAL",

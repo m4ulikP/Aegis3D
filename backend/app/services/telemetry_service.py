@@ -68,6 +68,10 @@ from app.services.anomaly_service import AnomalyService
 from app.services.correlation_service import CorrelationService
 from app.services.health_service import HealthService
 from app.services.live_bus import get_live_event_bus
+from app.services.sensor_registry import (
+    SensorRegistryService,
+    get_sensor_registry,
+)
 from app.services.trend_service import TrendService
 
 
@@ -208,10 +212,12 @@ class TelemetryService:
         correlation_service: Optional[CorrelationService] = None,
         trend_service: Optional[TrendService] = None,
         health_service: Optional[HealthService] = None,
+        sensor_registry: Optional[SensorRegistryService] = None,
     ) -> None:
         self.db = db
         self.event_repository = event_repository or EventRepository(db)
         self.baseline_repository = baseline_repository or BaselineRepository(db)
+        self.sensor_registry = sensor_registry or get_sensor_registry()
         self.anomaly_service = anomaly_service or AnomalyService(
             db,
             baseline_repository=self.baseline_repository,
@@ -271,54 +277,39 @@ class TelemetryService:
 
         raise ZoneNotFoundError(f"Zone '{zone_name}' not found")
 
-    # Canonical sensor → zone lookup.
-    # PZT-Z01…Z06 → Zone 1 (Main Deck Girder)
-    # PZT-Z07…Z12 → Zone 2 (Substructure Pier B)
-    _CANONICAL_SENSOR_ZONE_MAP: Dict[int, int] = {
-        **{n: 1 for n in range(1, 7)},
-        **{n: 2 for n in range(7, 13)},
-    }
-
     def validate_sensor_zone_consistency(self, sensor_id: str, zone: Zone) -> None:
         """Verify that sensor identifier belongs to the resolved zone.
 
-        Two-path validation:
-        - Canonical format ``PZT-ZNN`` (e.g. PZT-Z01…PZT-Z12): checked via the
-          built-in _CANONICAL_SENSOR_ZONE_MAP so that PZT-Z07 correctly maps to
-          Zone 2 even though its numeric suffix (7) does not match "Zone 2".
-        - Legacy format ``PZT-Z<zone>-<node>`` (e.g. PZT-Z1-01): falls back to
-          the original regex-based zone number comparison.
+        Resolves sensor metadata from the canonical BIM sensor registry.
+        The sensor_id is an identity, not a zone encoding.
         """
-        # ── Canonical format: exactly PZT-Z followed by two digits ──────────
-        canonical_match = re.fullmatch(
-            r"PZT-Z(\d{2})", sensor_id, re.IGNORECASE
-        )
-        if canonical_match:
-            sensor_num = int(canonical_match.group(1))
-            expected_zone_num = self._CANONICAL_SENSOR_ZONE_MAP.get(sensor_num)
-            if expected_zone_num is not None:
-                zone_match = re.search(r"Zone\s*(\d+)", zone.name, re.IGNORECASE)
-                if zone_match:
-                    zone_num = int(zone_match.group(1))
-                    if expected_zone_num != zone_num:
-                        raise InconsistentSensorZoneError(
-                            f"Sensor '{sensor_id}' (canonical Zone {expected_zone_num}) "
-                            f"was submitted to '{zone.name}' (Zone {zone_num})"
-                        )
-            # Canonical sensor accepted even if zone number is not DB-registered
-            return
+        sensor = self.sensor_registry.get_sensor(sensor_id)
+        if not sensor:
+            raise InconsistentSensorZoneError(
+                f"Sensor '{sensor_id}' is not registered in the canonical BIM sensor registry"
+            )
 
-        # ── Legacy format: PZT-Z<zone>-<node> or any other pattern ─────────
-        sensor_match = re.search(r"Z(\d+)", sensor_id, re.IGNORECASE)
-        if sensor_match:
-            sensor_zone_num = int(sensor_match.group(1))
-            zone_match = re.search(r"Zone\s*(\d+)", zone.name, re.IGNORECASE)
-            if zone_match:
-                zone_num = int(zone_match.group(1))
-                if sensor_zone_num != zone_num:
-                    raise InconsistentSensorZoneError(
-                        f"Sensor '{sensor_id}' (Zone {sensor_zone_num}) is inconsistent with target zone '{zone.name}' (Zone {zone_num})"
-                    )
+        if sensor.zone_id is None:
+            raise InconsistentSensorZoneError(
+                f"Sensor '{sensor_id}' (storey: '{sensor.storey}') is a canonical sensor that is not currently assigned to monitoring zone '{zone.name}'"
+            )
+
+        matches_id = (sensor.zone_id == zone.id)
+        matches_name = bool(
+            sensor.zone_name
+            and sensor.zone_name.strip().lower() == zone.name.strip().lower()
+        )
+
+        zone_num_match = re.search(r"Zone\s*(\d+)", zone.name, re.IGNORECASE)
+        matches_num = False
+        if zone_num_match:
+            matches_num = (int(zone_num_match.group(1)) == sensor.zone_id)
+
+        if not (matches_id or matches_name or matches_num):
+            raise InconsistentSensorZoneError(
+                f"Sensor '{sensor_id}' (canonical {sensor.zone_name or f'Zone {sensor.zone_id}'}, "
+                f"storey: {sensor.storey}) is inconsistent with target zone '{zone.name}'"
+            )
 
     def resolve_session(self, session_id: Optional[int] = None) -> MonitoringSession:
         """Resolve an active or specified MonitoringSession."""

@@ -155,19 +155,19 @@ def run_correlation_demo(
     seed: Optional[int] = None,
 ) -> None:
     """
-    Demonstrate 2-PZT cross-sensor correlation across PZT-Z01 and PZT-Z02 in Zone 1.
+    Demonstrate 2-PZT cross-sensor correlation across PZT-Z05 and PZT-Z06 in Zone 1.
 
     Generates temporally related acoustic stress signals:
-    - PZT-Z01 receives primary burst wave first.
-    - PZT-Z02 receives secondary burst delayed by 5ms (< 25ms backend tolerance window).
+    - PZT-Z05 receives primary burst wave first.
+    - PZT-Z06 receives secondary burst delayed by 5ms (< 25ms backend tolerance window).
     """
-    sensor1 = VirtualPZTSensor(sensor_id="PZT-Z01", zone_name=ZONE_MAIN_DECK)
-    sensor2 = VirtualPZTSensor(sensor_id="PZT-Z02", zone_name=ZONE_MAIN_DECK)
+    sensor1 = VirtualPZTSensor(sensor_id="PZT-Z05", zone_name=ZONE_MAIN_DECK)
+    sensor2 = VirtualPZTSensor(sensor_id="PZT-Z06", zone_name=ZONE_MAIN_DECK)
 
     print(f"\nStarting 2-PZT Cross-Sensor Correlation Demo:")
     print(f"  Target:    {client.full_url}")
     print(f"  Zone:      {ZONE_MAIN_DECK}")
-    print(f"  Sensors:   PZT-Z01 (Primary) and PZT-Z02 (Secondary, +5ms TDOA)")
+    print(f"  Sensors:   PZT-Z05 (Primary) and PZT-Z06 (Secondary, +5ms TDOA)")
     print(f"  Batches:   {batches if batches > 0 else 'Continuous'} | Interval: {interval_seconds}s")
     print("-" * 72)
 
