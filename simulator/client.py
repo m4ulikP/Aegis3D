@@ -221,7 +221,7 @@ def main() -> None:
     )
 
     # 2. Construct valid TelemetryIngestRequest & 3. Generate healthy waveform
-    sensor = VirtualPZTSensor(sensor_id="PZT-Z1-01")
+    sensor = VirtualPZTSensor(sensor_id="PZT-Z01")
     payload = sensor.generate_payload(mode="healthy", sample_count=1000, seed=42)
 
     print(f"\n[REQUEST SETUP]")

@@ -66,16 +66,6 @@ export interface ZoneBimMappingFile {
 interface DigitalTwinViewerProps {
     onClose: () => void;
     initialZoneId?: number | null;
-
-    /**
-     * IFC GUID of the structural component that should be
-     * explicitly highlighted by the digital twin.
-     *
-     * This is intentionally independent from zone selection.
-     * Later this can be driven by backend anomaly localization,
-     * sensor/path localization, or another frontend interaction.
-     */
-    selectedComponentGuid?: string | null;
 }
 
 /* =========================================================
@@ -96,52 +86,22 @@ export function resolveBackendZone(
 
     // 2. Case-insensitive / trimmed name match
     const normalizedMatch = backendZones.find(
-        (bz) =>
-            bz.name.trim().toLowerCase() ===
-            mappingZone.zone_name.trim().toLowerCase()
+        (bz) => bz.name.trim().toLowerCase() === mappingZone.zone_name.trim().toLowerCase()
     );
     if (normalizedMatch) return normalizedMatch;
 
     // 3. Match by zone number if name starts with "Zone X"
     const zoneNumMatch = mappingZone.zone_name.match(/Zone\s*(\d+)/i);
-
     if (zoneNumMatch) {
         const num = zoneNumMatch[1];
-
         const numMatch = backendZones.find((bz) => {
             const bzNum = bz.name.match(/Zone\s*(\d+)/i);
             return bzNum && bzNum[1] === num;
         });
-
         if (numMatch) return numMatch;
     }
 
     return undefined;
-}
-
-/* =========================================================
-   GLB NODE NAME NORMALIZATION
-========================================================= */
-
-/**
- * Blender / GLB export can rewrite IFC-derived node names.
- *
- * The canonical mapping file contains names such as:
- *   IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124614
- *
- * The exported GLB currently contains:
- *   IfcBeamM_Concrete-Rectangular_Beam300_x_600mm124614
- *
- * They represent the same node, but Three.js sees the exported
- * name literally. Normalizing both forms lets the existing
- * IFC GUID -> GLB mapping work without changing the canonical
- * mapping artifact.
- */
-function normalizeGlbNodeName(name: string): string {
-    return name
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "");
 }
 
 /* =========================================================
@@ -150,12 +110,19 @@ function normalizeGlbNodeName(name: string): string {
 
 interface BuildingModelProps {
     mapping: ZoneBimMappingFile | null;
-    selectedComponentGuid?: string | null;
+    activeZoneId: number | null;
+    zones: ZoneResponse[];
+    zoneHealthMap: Record<number, ZoneHealthResponse>;
+    alerts: AlertResponse[];
+    onSelectZone?: (zoneId: number) => void;
 }
 
 function BuildingModel({
     mapping,
-    selectedComponentGuid = null,
+    activeZoneId,
+    zones,
+    zoneHealthMap,
+    alerts,
 }: BuildingModelProps) {
     const { scene } = useGLTF("/models/building_demo.glb");
 
@@ -181,119 +148,53 @@ function BuildingModel({
         model.traverse((child) => {
             if (child instanceof THREE.Mesh) {
                 const name = child.name;
-
                 if (name) {
-                    // Keep the exact exported name.
-                    const exactList = mNodeMap.get(name) || [];
-                    exactList.push(child);
-                    mNodeMap.set(name, exactList);
-
-                    // Also keep a normalized alias so IFC mapping names
-                    // survive Blender/GLB name sanitization.
-                    const normalizedName = normalizeGlbNodeName(name);
-
-                    if (normalizedName && normalizedName !== name) {
-                        const normalizedList =
-                            mNodeMap.get(normalizedName) || [];
-
-                        normalizedList.push(child);
-                        mNodeMap.set(normalizedName, normalizedList);
-                    }
+                    const list = mNodeMap.get(name) || [];
+                    list.push(child);
+                    mNodeMap.set(name, list);
                 }
-
                 mOrigMat.set(child, child.material);
             }
         });
 
-        return {
-            meshMap: mNodeMap,
-            originalMaterials: mOrigMat,
-        };
+        return { meshMap: mNodeMap, originalMaterials: mOrigMat };
     }, [model]);
 
-    /*
-     * Resolve individual IFC components to their actual GLB meshes.
-     *
-     * This is deliberately separate from zoneMeshesMap.
-     *
-     * zoneMeshesMap:
-     *     zone_id -> meshes[]
-     *
-     * componentMeshesMap:
-     *     IFC GUID -> meshes[]
-     *
-     * This gives us a stable bridge for future:
-     *
-     * backend anomaly
-     *      -> IFC GUID
-     *      -> GLB node
-     *      -> component highlight
-     */
-    const componentMeshesMap = useMemo(() => {
-        const cMap = new Map<string, THREE.Mesh[]>();
+    // Resolve mapped components in zone_bim_mapping.json to Three.js meshes
+    const zoneMeshesMap = useMemo(() => {
+        const zMap = new Map<number, THREE.Mesh[]>();
+        if (!mapping?.zones) return zMap;
 
-        if (!mapping?.zones) return cMap;
+        let totalResolved = 0;
+        let totalUnresolved = 0;
 
         for (const zone of mapping.zones) {
-            for (const component of zone.components) {
-                const found =
-                    meshMap.get(component.glb_node) ||
-                    meshMap.get(normalizeGlbNodeName(component.glb_node));
-
+            const meshes: THREE.Mesh[] = [];
+            for (const comp of zone.components) {
+                const found = meshMap.get(comp.glb_node);
                 if (found && found.length > 0) {
-                    const existing = cMap.get(component.ifc_guid) || [];
-                    cMap.set(component.ifc_guid, [...existing, ...found]);
+                    meshes.push(...found);
+                    totalResolved++;
+                } else {
+                    totalUnresolved++;
+                    console.warn(`[Aegis3D BIM Viewer] Unresolved GLB node: ${comp.glb_node}`);
                 }
             }
+            zMap.set(zone.zone_id, meshes);
         }
 
-        return cMap;
+        console.info(
+            `[Aegis3D BIM Viewer] Scene resolved ${totalResolved} component meshes (${totalUnresolved} unresolved)`
+        );
+        return zMap;
     }, [mapping, meshMap]);
 
-    /*
-     * Resolve the currently targeted IFC component.
-     *
-     * We keep the component metadata as well as its meshes so that
-     * the next frontend step can build an inspector without having
-     * to repeat the mapping lookup.
-     */
-    const selectedComponent = useMemo(() => {
-        if (!selectedComponentGuid || !mapping?.zones) {
-            return null;
-        }
-
-        for (const zone of mapping.zones) {
-            const component = zone.components.find(
-                (candidate) =>
-                    candidate.ifc_guid === selectedComponentGuid
-            );
-
-            if (component) {
-                return {
-                    component,
-                    zone,
-                    meshes:
-                        componentMeshesMap.get(selectedComponentGuid) || [],
-                };
-            }
-        }
-
-        console.warn(
-            `[Aegis3D BIM Viewer] IFC GUID not found in mapping: ${selectedComponentGuid}`
-        );
-
-        return null;
-    }, [selectedComponentGuid, mapping, componentMeshesMap]);
-
-    // Apply reversible material highlighting
+    // Apply reversible material highlighting based on live health and active selection
     useEffect(() => {
         const createdMaterials: THREE.Material[] = [];
 
-        function createHighlightMaterial(
-            type: "critical" | "warning" | "selected" | "component"
-        ) {
+        function createHighlightMaterial(type: "critical" | "warning" | "selected") {
             let mat: THREE.MeshStandardMaterial;
-
             if (type === "critical") {
                 mat = new THREE.MeshStandardMaterial({
                     color: new THREE.Color("#f87171"),
@@ -310,8 +211,8 @@ function BuildingModel({
                     roughness: 0.25,
                     metalness: 0.1,
                 });
-            } else if (type === "selected") {
-                // Existing healthy-zone selection
+            } else {
+                // Active selection of healthy zone
                 mat = new THREE.MeshStandardMaterial({
                     color: new THREE.Color("#38bdf8"),
                     emissive: new THREE.Color("#0284c7"),
@@ -319,79 +220,75 @@ function BuildingModel({
                     roughness: 0.3,
                     metalness: 0.15,
                 });
-            } else {
-                /*
-                 * Individual component localization.
-                 *
-                 * This is intentionally visually distinct from the
-                 * existing zone-level critical/warning states.
-                 */
-                mat = new THREE.MeshStandardMaterial({
-                    color: new THREE.Color("#f43f5e"),
-                    emissive: new THREE.Color("#e11d48"),
-                    emissiveIntensity: 1.0,
-                    roughness: 0.2,
-                    metalness: 0.1,
-                });
             }
-
             createdMaterials.push(mat);
             return mat;
         }
 
-        // ---------------------------------------------------------
-        // 1. Restore every original material
-        // ---------------------------------------------------------
-
+        // 1. Restore all original materials
         originalMaterials.forEach((origMat, mesh) => {
             mesh.material = origMat;
         });
 
-        // ---------------------------------------------------------
-        // 2. Zone status stays in the UI; do NOT color every mesh
-        // ---------------------------------------------------------
-        //
-        // Zone alerts/health are represented by the left-hand zone
-        // cards. The 3D model is intentionally localized to the
-        // specific IFC component identified by selectedComponentGuid.
-        // This prevents an anomaly in one component from coloring an
-        // entire floor/zone.
+        // 2. Apply highlights to mapped zone groups
+        if (mapping?.zones) {
+            for (const zone of mapping.zones) {
+                const meshes = zoneMeshesMap.get(zone.zone_id) || [];
+                if (meshes.length === 0) continue;
 
-        // ---------------------------------------------------------
-        // 3. Individual component localization
-        // ---------------------------------------------------------
+                const isSelected = activeZoneId === zone.zone_id;
+                const isViewingAll = activeZoneId === null;
 
-        if (selectedComponent?.meshes.length) {
-            const componentMaterial =
-                createHighlightMaterial("component");
+                const backendZone = resolveBackendZone(zone, zones);
+                const backendZoneId = backendZone?.id;
 
-            for (const mesh of selectedComponent.meshes) {
-                mesh.material = componentMaterial;
+                const zoneAlerts = backendZoneId !== undefined
+                    ? alerts.filter((a) => a.zone_id === backendZoneId && a.status === "ACTIVE")
+                    : [];
+                const health = backendZoneId !== undefined ? zoneHealthMap[backendZoneId] : undefined;
+
+                const hasCriticalAlert = zoneAlerts.some(
+                    (a) => a.severity === "CRITICAL" || a.severity === "HIGH"
+                );
+                const hasWarningAlert = zoneAlerts.some(
+                    (a) => a.severity === "MEDIUM" || a.severity === "LOW"
+                );
+
+                const isCriticalHealth =
+                    health?.status === "HIGH_PRIORITY_INSPECTION" ||
+                    health?.status === "INSPECTION_ADVISED";
+                const isWarningHealth = health?.status === "MONITOR";
+
+                let highlightType: "critical" | "warning" | "selected" | null = null;
+
+                if (hasCriticalAlert || isCriticalHealth) {
+                    highlightType = "critical";
+                } else if (hasWarningAlert || isWarningHealth) {
+                    highlightType = "warning";
+                } else if (isSelected) {
+                    highlightType = "selected";
+                }
+
+                // If user selected a specific zone, only highlight that zone unless in 'view all' mode
+                if (highlightType) {
+                    if (isViewingAll || isSelected) {
+                        const mat = createHighlightMaterial(highlightType);
+                        for (const mesh of meshes) {
+                            mesh.material = mat;
+                        }
+                    }
+                }
             }
-
-            console.info(
-                `[Aegis3D BIM Viewer] Highlighted component ${selectedComponent.component.ifc_guid} -> ${selectedComponent.component.glb_node}`
-            );
         }
 
-        // ---------------------------------------------------------
-        // Cleanup
-        // ---------------------------------------------------------
-
+        // Cleanup on unmount or state change
         return () => {
             originalMaterials.forEach((origMat, mesh) => {
                 mesh.material = origMat;
             });
-
             createdMaterials.forEach((mat) => mat.dispose());
         };
-    }, [
-        mapping,
-        componentMeshesMap,
-        selectedComponent,
-        selectedComponentGuid,
-        originalMaterials,
-    ]);
+    }, [mapping, zoneMeshesMap, activeZoneId, zones, zoneHealthMap, alerts, originalMaterials]);
 
     return <primitive object={model} />;
 }
@@ -424,27 +321,15 @@ useGLTF.preload("/models/building_demo.glb");
 export default function DigitalTwinViewer({
     onClose,
     initialZoneId = null,
-    selectedComponentGuid = "1WrzGm1SD2ev45B_OWQ3El",
 }: DigitalTwinViewerProps) {
-    const [mapping, setMapping] =
-        useState<ZoneBimMappingFile | null>(null);
-
+    const [mapping, setMapping] = useState<ZoneBimMappingFile | null>(null);
     const [zones, setZones] = useState<ZoneResponse[]>([]);
     const [alerts, setAlerts] = useState<AlertResponse[]>([]);
-    const [zoneHealthMap, setZoneHealthMap] =
-        useState<Record<number, ZoneHealthResponse>>({});
-
-    const [activeZoneId, setActiveZoneId] =
-        useState<number | null>(initialZoneId);
-
-    const [hudCollapsed, setHudCollapsed] =
-        useState<boolean>(false);
-
-    const [loading, setLoading] =
-        useState<boolean>(true);
-
-    const [error, setError] =
-        useState<string | null>(null);
+    const [zoneHealthMap, setZoneHealthMap] = useState<Record<number, ZoneHealthResponse>>({});
+    const [activeZoneId, setActiveZoneId] = useState<number | null>(initialZoneId);
+    const [hudCollapsed, setHudCollapsed] = useState<boolean>(false);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
 
     // Load canonical mapping and live monitoring telemetry
     useEffect(() => {
@@ -454,59 +339,33 @@ export default function DigitalTwinViewer({
         async function initViewerData() {
             try {
                 // 1. Fetch canonical Step 1 mapping artifact
-                const mapRes = await fetch(
-                    "/data/zone_bim_mapping.json"
-                );
-
+                const mapRes = await fetch("/data/zone_bim_mapping.json");
                 if (!mapRes.ok) {
-                    throw new Error(
-                        `Failed to load zone BIM mapping: HTTP ${mapRes.status}`
-                    );
+                    throw new Error(`Failed to load zone BIM mapping: HTTP ${mapRes.status}`);
                 }
-
-                const mapData: ZoneBimMappingFile =
-                    await mapRes.json();
+                const mapData: ZoneBimMappingFile = await mapRes.json();
 
                 // 2. Fetch live zones and active alerts
-                const [zonesData, alertsData] =
-                    await Promise.all([
-                        api.getZones().catch((err) => {
-                            console.warn(
-                                "Failed to fetch zones for BIM viewer:",
-                                err
-                            );
-
-                            return [];
-                        }),
-
-                        api.getAlerts().catch((err) => {
-                            console.warn(
-                                "Failed to fetch alerts for BIM viewer:",
-                                err
-                            );
-
-                            return [];
-                        }),
-                    ]);
+                const [zonesData, alertsData] = await Promise.all([
+                    api.getZones().catch((err) => {
+                        console.warn("Failed to fetch zones for BIM viewer:", err);
+                        return [];
+                    }),
+                    api.getAlerts().catch((err) => {
+                        console.warn("Failed to fetch alerts for BIM viewer:", err);
+                        return [];
+                    }),
+                ]);
 
                 // 3. Fetch detailed health status for each zone
-                const healthEntries: Record<
-                    number,
-                    ZoneHealthResponse
-                > = {};
-
+                const healthEntries: Record<number, ZoneHealthResponse> = {};
                 await Promise.all(
                     zonesData.map(async (z) => {
                         try {
-                            const h =
-                                await api.getZoneHealth(z.id);
-
+                            const h = await api.getZoneHealth(z.id);
                             healthEntries[z.id] = h;
                         } catch (hErr) {
-                            console.warn(
-                                `Failed to fetch health for zone ${z.id}:`,
-                                hErr
-                            );
+                            console.warn(`Failed to fetch health for zone ${z.id}:`, hErr);
                         }
                     })
                 );
@@ -552,16 +411,8 @@ export default function DigitalTwinViewer({
                 }
             } catch (err: any) {
                 if (isMounted) {
-                    console.error(
-                        "[Aegis3D BIM Viewer] Initialization error:",
-                        err
-                    );
-
-                    setError(
-                        err.message ||
-                        "Failed to initialize Digital Twin viewer"
-                    );
-
+                    console.error("[Aegis3D BIM Viewer] Initialization error:", err);
+                    setError(err.message || "Failed to initialize Digital Twin viewer");
                     setLoading(false);
                 }
             }
@@ -577,14 +428,7 @@ export default function DigitalTwinViewer({
 
     const totalMappedComponents = useMemo(() => {
         if (!mapping?.zones) return 0;
-
-        return mapping.zones.reduce(
-            (sum, z) =>
-                sum +
-                (z.resolved_component_count ||
-                    z.components.length),
-            0
-        );
+        return mapping.zones.reduce((sum, z) => sum + (z.resolved_component_count || z.components.length), 0);
     }, [mapping]);
 
     return (
@@ -601,7 +445,6 @@ export default function DigitalTwinViewer({
             {/* =====================================================
                 TOP BAR
             ===================================================== */}
-
             <div
                 style={{
                     position: "absolute",
@@ -614,22 +457,13 @@ export default function DigitalTwinViewer({
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: "0 24px",
-                    background:
-                        "linear-gradient(to bottom, rgba(2,6,23,0.95), rgba(2,6,23,0.65))",
-                    borderBottom:
-                        "1px solid rgba(148,163,184,0.15)",
+                    background: "linear-gradient(to bottom, rgba(2,6,23,0.95), rgba(2,6,23,0.65))",
+                    borderBottom: "1px solid rgba(148,163,184,0.15)",
                     backdropFilter: "blur(10px)",
                 }}
             >
                 {/* Left Branding */}
-
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 14,
-                    }}
-                >
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <div
                         style={{
                             fontSize: 18,
@@ -640,36 +474,24 @@ export default function DigitalTwinViewer({
                     >
                         AEGIS3D
                     </div>
-
                     <div
                         style={{
                             width: 1,
                             height: 22,
-                            background:
-                                "rgba(148,163,184,0.3)",
+                            background: "rgba(148,163,184,0.3)",
                         }}
                     />
-
-                    <div
-                        style={{
-                            fontSize: 14,
-                            color: "#94a3b8",
-                        }}
-                    >
-                        Structural Digital Twin & Health
-                        Visualization
+                    <div style={{ fontSize: 14, color: "#94a3b8" }}>
+                        Structural Digital Twin & Health Visualization
                     </div>
                 </div>
 
                 {/* Right Close Button */}
-
                 <button
                     onClick={onClose}
                     style={{
-                        border:
-                            "1px solid rgba(148,163,184,0.25)",
-                        background:
-                            "rgba(15,23,42,0.8)",
+                        border: "1px solid rgba(148,163,184,0.25)",
+                        background: "rgba(15,23,42,0.8)",
                         color: "#e2e8f0",
                         padding: "9px 16px",
                         borderRadius: 8,
@@ -686,7 +508,6 @@ export default function DigitalTwinViewer({
             {/* =====================================================
                 LEFT HUD: ZONE & STRUCTURAL BIM INSPECTOR
             ===================================================== */}
-
             <div
                 className="custom-scrollbar"
                 style={{
@@ -698,75 +519,30 @@ export default function DigitalTwinViewer({
                     maxWidth: "calc(100vw - 40px)",
                     maxHeight: "calc(100dvh - 96px)",
                     overflowY: "auto",
-                    background:
-                        "rgba(15, 23, 42, 0.88)",
+                    background: "rgba(15, 23, 42, 0.88)",
                     backdropFilter: "blur(12px)",
-                    border:
-                        "1px solid rgba(148, 163, 184, 0.2)",
+                    border: "1px solid rgba(148, 163, 184, 0.2)",
                     borderRadius: 10,
                     padding: 16,
                     paddingRight: 8,
                     color: "#f1f5f9",
-                    boxShadow:
-                        "0 20px 25px -5px rgba(0, 0, 0, 0.6)",
+                    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.6)",
                 }}
             >
-                <div
-                    style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: 6,
-                    }}
-                >
-                    <h2
-                        style={{
-                            fontSize: 14,
-                            fontWeight: 700,
-                            color: "#67e8f9",
-                            margin: 0,
-                            textTransform: "uppercase",
-                        }}
-                    >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <h2 style={{ fontSize: 14, fontWeight: 700, color: "#67e8f9", margin: 0, textTransform: "uppercase" }}>
                         Monitored BIM Zones
                     </h2>
-
-                    <span
-                        style={{
-                            fontSize: 11,
-                            color: "#94a3b8",
-                            background:
-                                "rgba(51, 65, 85, 0.6)",
-                            padding: "2px 6px",
-                            borderRadius: 4,
-                        }}
-                    >
-                        {totalMappedComponents} elements
-                        mapped
+                    <span style={{ fontSize: 11, color: "#94a3b8", background: "rgba(51, 65, 85, 0.6)", padding: "2px 6px", borderRadius: 4 }}>
+                        {totalMappedComponents} elements mapped
                     </span>
                 </div>
-
-                <p
-                    style={{
-                        fontSize: 11,
-                        color: "#94a3b8",
-                        margin: "0 0 12px 0",
-                        lineHeight: 1.4,
-                    }}
-                >
-                    Option 1: Inferred spatial component
-                    groups linked to live telemetry.
+                <p style={{ fontSize: 11, color: "#94a3b8", margin: "0 0 12px 0", lineHeight: 1.4 }}>
+                    Option 1: Inferred spatial component groups linked to live telemetry.
                 </p>
 
                 {/* View Mode Selector */}
-
-                <div
-                    style={{
-                        display: "flex",
-                        gap: 6,
-                        marginBottom: 12,
-                    }}
-                >
+                <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                     <button
                         onClick={() => setActiveZoneId(null)}
                         style={{
@@ -775,51 +551,27 @@ export default function DigitalTwinViewer({
                             fontSize: 11,
                             fontWeight: 600,
                             borderRadius: 6,
-                            border:
-                                activeZoneId === null
-                                    ? "1px solid #38bdf8"
-                                    : "1px solid rgba(148, 163, 184, 0.2)",
-                            background:
-                                activeZoneId === null
-                                    ? "rgba(56, 189, 248, 0.2)"
-                                    : "rgba(30, 41, 59, 0.6)",
-                            color:
-                                activeZoneId === null
-                                    ? "#38bdf8"
-                                    : "#cbd5e1",
+                            border: activeZoneId === null ? "1px solid #38bdf8" : "1px solid rgba(148, 163, 184, 0.2)",
+                            background: activeZoneId === null ? "rgba(56, 189, 248, 0.2)" : "rgba(30, 41, 59, 0.6)",
+                            color: activeZoneId === null ? "#38bdf8" : "#cbd5e1",
                             cursor: "pointer",
                         }}
                     >
                         All Anomaly Highlights
                     </button>
-
                     {mapping?.zones.map((z) => (
                         <button
                             key={z.zone_id}
-                            onClick={() =>
-                                setActiveZoneId(z.zone_id)
-                            }
+                            onClick={() => setActiveZoneId(z.zone_id)}
                             style={{
                                 flex: 1,
                                 padding: "6px 8px",
                                 fontSize: 11,
                                 fontWeight: 600,
                                 borderRadius: 6,
-                                border:
-                                    activeZoneId ===
-                                        z.zone_id
-                                        ? "1px solid #67e8f9"
-                                        : "1px solid rgba(148, 163, 184, 0.2)",
-                                background:
-                                    activeZoneId ===
-                                        z.zone_id
-                                        ? "rgba(34, 211, 238, 0.2)"
-                                        : "rgba(30, 41, 59, 0.6)",
-                                color:
-                                    activeZoneId ===
-                                        z.zone_id
-                                        ? "#67e8f9"
-                                        : "#cbd5e1",
+                                border: activeZoneId === z.zone_id ? "1px solid #67e8f9" : "1px solid rgba(148, 163, 184, 0.2)",
+                                background: activeZoneId === z.zone_id ? "rgba(34, 211, 238, 0.2)" : "rgba(30, 41, 59, 0.6)",
+                                color: activeZoneId === z.zone_id ? "#67e8f9" : "#cbd5e1",
                                 cursor: "pointer",
                             }}
                         >
@@ -829,295 +581,115 @@ export default function DigitalTwinViewer({
                 </div>
 
                 {/* Zone Cards */}
-
-                <div
-                    style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 10,
-                    }}
-                >
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {mapping?.zones.map((zone) => {
-                        const backendZone =
-                            resolveBackendZone(
-                                zone,
-                                zones
-                            );
-
-                        const backendZoneId =
-                            backendZone?.id;
-
-                        const health =
-                            backendZoneId !== undefined
-                                ? zoneHealthMap[
-                                backendZoneId
-                                ]
-                                : undefined;
-
-                        const zoneAlerts =
-                            backendZoneId !== undefined
-                                ? alerts.filter(
-                                    (a) =>
-                                        a.zone_id ===
-                                        backendZoneId &&
-                                        a.status ===
-                                        "ACTIVE"
-                                )
-                                : [];
-
-                        const isSelected =
-                            activeZoneId === zone.zone_id;
-
+                        const backendZone = resolveBackendZone(zone, zones);
+                        const backendZoneId = backendZone?.id;
+                        const health = backendZoneId !== undefined ? zoneHealthMap[backendZoneId] : undefined;
+                        const zoneAlerts = backendZoneId !== undefined
+                            ? alerts.filter((a) => a.zone_id === backendZoneId && a.status === "ACTIVE")
+                            : [];
+                        const isSelected = activeZoneId === zone.zone_id;
                         const isCritical =
-                            zoneAlerts.some(
-                                (a) =>
-                                    a.severity ===
-                                    "CRITICAL" ||
-                                    a.severity === "HIGH"
-                            ) ||
-                            health?.status ===
-                            "HIGH_PRIORITY_INSPECTION" ||
-                            health?.status ===
-                            "INSPECTION_ADVISED";
-
+                            zoneAlerts.some((a) => a.severity === "CRITICAL" || a.severity === "HIGH") ||
+                            health?.status === "HIGH_PRIORITY_INSPECTION" ||
+                            health?.status === "INSPECTION_ADVISED";
                         const isWarning =
-                            zoneAlerts.some(
-                                (a) =>
-                                    a.severity ===
-                                    "MEDIUM" ||
-                                    a.severity === "LOW"
-                            ) ||
-                            health?.status ===
-                            "MONITOR";
+                            zoneAlerts.some((a) => a.severity === "MEDIUM" || a.severity === "LOW") ||
+                            health?.status === "MONITOR";
 
                         return (
                             <div
                                 key={zone.zone_id}
-                                onClick={() =>
-                                    setActiveZoneId(
-                                        zone.zone_id
-                                    )
-                                }
+                                onClick={() => setActiveZoneId(zone.zone_id)}
                                 style={{
                                     border: isSelected
                                         ? "1px solid #38bdf8"
                                         : isCritical
-                                            ? "1px solid rgba(239, 68, 68, 0.5)"
-                                            : "1px solid rgba(75, 85, 99, 0.4)",
-                                    background:
-                                        isSelected
-                                            ? "rgba(30, 58, 138, 0.3)"
-                                            : "rgba(30, 41, 59, 0.5)",
+                                        ? "1px solid rgba(239, 68, 68, 0.5)"
+                                        : "1px solid rgba(75, 85, 99, 0.4)",
+                                    background: isSelected
+                                        ? "rgba(30, 58, 138, 0.3)"
+                                        : "rgba(30, 41, 59, 0.5)",
                                     borderRadius: 8,
                                     padding: 12,
                                     cursor: "pointer",
-                                    transition:
-                                        "all 0.15s ease",
+                                    transition: "all 0.15s ease",
                                 }}
                             >
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        justifyContent:
-                                            "space-between",
-                                        alignItems:
-                                            "flex-start",
-                                        marginBottom: 4,
-                                    }}
-                                >
-                                    <div
-                                        style={{
-                                            fontWeight: 600,
-                                            fontSize: 13,
-                                            color: "#f8fafc",
-                                        }}
-                                    >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                                    <div style={{ fontWeight: 600, fontSize: 13, color: "#f8fafc" }}>
                                         {zone.zone_name}
                                     </div>
-
                                     <span
                                         style={{
                                             fontSize: 10,
                                             fontWeight: 700,
-                                            padding:
-                                                "2px 6px",
+                                            padding: "2px 6px",
                                             borderRadius: 4,
-                                            background:
-                                                isCritical
-                                                    ? "#dc2626"
-                                                    : isWarning
-                                                        ? "#d97706"
-                                                        : "#059669",
+                                            background: isCritical ? "#dc2626" : isWarning ? "#d97706" : "#059669",
                                             color: "#ffffff",
                                         }}
                                     >
-                                        {isCritical &&
-                                            zoneAlerts.length >
-                                            0 &&
-                                            (!health ||
-                                                health.status ===
-                                                "NORMAL")
+                                        {isCritical && zoneAlerts.length > 0 && (!health || health.status === "NORMAL")
                                             ? "ALERT ACTIVE"
-                                            : health?.status ??
-                                            (isCritical
-                                                ? "ALERT ACTIVE"
-                                                : "NORMAL")}
+                                            : (health?.status ?? (isCritical ? "ALERT ACTIVE" : "NORMAL"))}
                                     </span>
                                 </div>
 
-                                <div
-                                    style={{
-                                        fontSize: 11,
-                                        color: "#94a3b8",
-                                        marginBottom: 6,
-                                    }}
-                                >
-                                    Storey:{" "}
-                                    <span
-                                        style={{
-                                            color: "#e2e8f0",
-                                        }}
-                                    >
-                                        {
-                                            zone
-                                                .mapping_rule
-                                                .storey_name
-                                        }
-                                    </span>{" "}
-                                    · Type:{" "}
-                                    <span
-                                        style={{
-                                            color: "#e2e8f0",
-                                        }}
-                                    >
-                                        {
-                                            zone
-                                                .mapping_rule
-                                                .component_type
-                                        }
-                                    </span>{" "}
-                                    (
-                                    {
-                                        zone.components
-                                            .length
-                                    }{" "}
-                                    elements)
+                                <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>
+                                    Storey: <span style={{ color: "#e2e8f0" }}>{zone.mapping_rule.storey_name}</span> · Type:{" "}
+                                    <span style={{ color: "#e2e8f0" }}>{zone.mapping_rule.component_type}</span> ({zone.components.length} elements)
                                 </div>
 
-                                {health?.score !==
-                                    undefined && (
-                                        <div
-                                            style={{
-                                                fontSize: 11,
-                                                color: "#cbd5e1",
-                                                marginBottom: 6,
-                                                display:
-                                                    "flex",
-                                                justifyContent:
-                                                    "space-between",
-                                            }}
-                                        >
-                                            <span>
-                                                Structural Health
-                                                Indicator (SHI):
-                                            </span>
+                                {health?.score !== undefined && (
+                                    <div style={{ fontSize: 11, color: "#cbd5e1", marginBottom: 6, display: "flex", justifyContent: "space-between" }}>
+                                        <span>Structural Health Indicator (SHI):</span>
+                                        <span style={{ fontWeight: 700, color: isCritical ? "#f87171" : isWarning ? "#fbbf24" : "#34d399" }}>
+                                            {health.score.toFixed(1)} / 100
+                                        </span>
+                                    </div>
+                                )}
 
-                                            <span
-                                                style={{
-                                                    fontWeight: 700,
-                                                    color: isCritical
-                                                        ? "#f87171"
-                                                        : isWarning
-                                                            ? "#fbbf24"
-                                                            : "#34d399",
-                                                }}
-                                            >
-                                                {health.score.toFixed(
-                                                    1
-                                                )}{" "}
-                                                / 100
-                                            </span>
+                                {zoneAlerts.length > 0 && (
+                                    <div
+                                        style={{
+                                            background: "rgba(220, 38, 38, 0.2)",
+                                            border: "1px solid rgba(239, 68, 68, 0.4)",
+                                            borderRadius: 6,
+                                            padding: "6px 8px",
+                                            marginTop: 6,
+                                            fontSize: 11,
+                                            color: "#fecaca",
+                                        }}
+                                    >
+                                        <div style={{ fontWeight: 700, color: "#fca5a5", marginBottom: 2 }}>
+                                            ⚠️ {zoneAlerts[0].title}
                                         </div>
-                                    )}
-
-                                {zoneAlerts.length >
-                                    0 && (
-                                        <div
-                                            style={{
-                                                background:
-                                                    "rgba(220, 38, 38, 0.2)",
-                                                border:
-                                                    "1px solid rgba(239, 68, 68, 0.4)",
-                                                borderRadius: 6,
-                                                padding:
-                                                    "6px 8px",
-                                                marginTop: 6,
-                                                fontSize: 11,
-                                                color: "#fecaca",
-                                            }}
-                                        >
-                                            <div
-                                                style={{
-                                                    fontWeight: 700,
-                                                    color: "#fca5a5",
-                                                    marginBottom: 2,
-                                                }}
-                                            >
-                                                ⚠️{" "}
-                                                {
-                                                    zoneAlerts[0]
-                                                        .title
-                                                }
-                                            </div>
-
-                                            <div
-                                                style={{
-                                                    fontSize: 10,
-                                                    color: "#e2e8f0",
-                                                }}
-                                            >
-                                                {
-                                                    zoneAlerts[0]
-                                                        .message
-                                                }
-                                            </div>
+                                        <div style={{ fontSize: 10, color: "#e2e8f0" }}>
+                                            {zoneAlerts[0].message}
                                         </div>
-                                    )}
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
                 </div>
 
                 {/* Architectural Prototype Disclaimer */}
-
                 <div
                     style={{
                         marginTop: 14,
                         padding: "8px 10px",
-                        background:
-                            "rgba(30, 41, 59, 0.4)",
-                        border:
-                            "1px solid rgba(148, 163, 184, 0.15)",
+                        background: "rgba(30, 41, 59, 0.4)",
+                        border: "1px solid rgba(148, 163, 184, 0.15)",
                         borderRadius: 6,
                         fontSize: 10,
                         color: "#94a3b8",
                         lineHeight: 1.4,
                     }}
                 >
-                    <span
-                        style={{
-                            fontWeight: 700,
-                            color: "#cbd5e1",
-                        }}
-                    >
-                        Prototype Disclaimer:
-                    </span>{" "}
-                    Zone anomalies are visually highlighted
-                    across the mapped structural framing
-                    group. This indicates monitoring state
-                    and does not establish certified
-                    structural damage or millimeter crack
-                    localization.
+                    <span style={{ fontWeight: 700, color: "#cbd5e1" }}>Prototype Disclaimer:</span> Zone anomalies are visually highlighted across the mapped structural framing group. This indicates monitoring state and does not establish certified structural damage or millimeter crack localization.
                 </div>
             </div>
 
@@ -1153,7 +725,6 @@ export default function DigitalTwinViewer({
             {/* =====================================================
                 3D CANVAS
             ===================================================== */}
-
             <Canvas
                 shadows
                 dpr={[1, 2]}
@@ -1165,23 +736,11 @@ export default function DigitalTwinViewer({
                 }}
                 gl={{ antialias: true }}
             >
-                <color
-                    attach="background"
-                    args={["#020617"]}
-                />
+                <color attach="background" args={["#020617"]} />
 
                 {/* Lighting */}
-
                 <ambientLight intensity={0.7} />
-
-                <hemisphereLight
-                    args={[
-                        "#dbeafe",
-                        "#0f172a",
-                        1.2,
-                    ]}
-                />
-
+                <hemisphereLight args={["#dbeafe", "#0f172a", 1.2]} />
                 <directionalLight
                     castShadow
                     position={[30, 40, 20]}
@@ -1191,20 +750,19 @@ export default function DigitalTwinViewer({
                 />
 
                 {/* Structural Digital Twin */}
-
                 <BuildingModel
                     mapping={mapping}
-                    selectedComponentGuid={
-                        selectedComponentGuid
-                    }
+                    activeZoneId={activeZoneId}
+                    zones={zones}
+                    zoneHealthMap={zoneHealthMap}
+                    alerts={alerts}
+                    onSelectZone={(id) => setActiveZoneId(id)}
                 />
 
                 {/* Floor Grid */}
-
                 <StaticFloor />
 
                 {/* Camera Orbit Controls */}
-
                 <OrbitControls
                     makeDefault
                     enableDamping
@@ -1225,17 +783,14 @@ export default function DigitalTwinViewer({
             {/* =====================================================
                 CONTROL HINT
             ===================================================== */}
-
             <div
                 style={{
                     position: "absolute",
                     bottom: 20,
                     left: 20,
                     padding: "10px 14px",
-                    background:
-                        "rgba(15,23,42,0.8)",
-                    border:
-                        "1px solid rgba(148,163,184,0.15)",
+                    background: "rgba(15,23,42,0.8)",
+                    border: "1px solid rgba(148,163,184,0.15)",
                     borderRadius: 8,
                     color: "#94a3b8",
                     fontSize: 12,
@@ -1243,16 +798,13 @@ export default function DigitalTwinViewer({
                 }}
             >
                 <div>Left click · Rotate</div>
-                <div>
-                    Middle / Right click · Pan
-                </div>
+                <div>Middle / Right click · Pan</div>
                 <div>Scroll · Zoom</div>
             </div>
 
             {/* =====================================================
                 STATUS INDICATOR
             ===================================================== */}
-
             <div
                 style={{
                     position: "absolute",
@@ -1262,10 +814,8 @@ export default function DigitalTwinViewer({
                     alignItems: "center",
                     gap: 10,
                     padding: "9px 14px",
-                    background:
-                        "rgba(15,23,42,0.8)",
-                    border:
-                        "1px solid rgba(148,163,184,0.15)",
+                    background: "rgba(15,23,42,0.8)",
+                    border: "1px solid rgba(148,163,184,0.15)",
                     borderRadius: 8,
                     color: "#cbd5e1",
                     fontSize: 12,
@@ -1277,25 +827,20 @@ export default function DigitalTwinViewer({
                         width: 7,
                         height: 7,
                         borderRadius: "50%",
-                        background: loading
-                            ? "#f59e0b"
-                            : error
-                                ? "#ef4444"
-                                : "#22c55e",
+                        background: loading ? "#f59e0b" : error ? "#ef4444" : "#22c55e",
                         boxShadow: loading
                             ? "0 0 8px rgba(245,158,11,0.7)"
                             : error
-                                ? "0 0 8px rgba(239,68,68,0.7)"
-                                : "0 0 8px rgba(34,197,94,0.7)",
+                            ? "0 0 8px rgba(239,68,68,0.7)"
+                            : "0 0 8px rgba(34,197,94,0.7)",
                     }}
                 />
-
                 <div>
                     {loading
                         ? "Syncing Live Telemetry..."
                         : error
-                            ? "BIM Offline"
-                            : "Digital Twin Synced · Live Health Connected"}
+                        ? "BIM Offline"
+                        : "Digital Twin Synced · Live Health Connected"}
                 </div>
             </div>
         </div>

@@ -1,0 +1,12 @@
+{
+  "total_zones": 2,
+  "health_status_counts": {
+    "NORMAL": 1,
+    "MONITOR": 1,
+    "INSPECTION_ADVISED": 0,
+    "HIGH_PRIORITY_INSPECTION": 0
+  },
+  "active_alerts_count": 1,
+  "recent_events_count": 26,
+  "latest_timestamp": "2026-09-27T10:13:13.156161Z"
+}

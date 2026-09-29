@@ -19,14 +19,14 @@ except ImportError:
 def test_virtual_pzt_initialization_and_inference():
     """Verify sensor initialization and zone name auto-inference."""
     # Sensor in Zone 1
-    s1 = VirtualPZTSensor(sensor_id="PZT-Z1-01")
-    assert s1.sensor_id == "PZT-Z1-01"
+    s1 = VirtualPZTSensor(sensor_id="PZT-Z01")
+    assert s1.sensor_id == "PZT-Z01"
     assert s1.zone_name == ZONE_MAIN_DECK
     assert s1.sample_rate_hz == 1000.0
     assert s1.sequence == 1
 
     # Sensor in Zone 2
-    s2 = VirtualPZTSensor(sensor_id="PZT-Z2-01")
+    s2 = VirtualPZTSensor(sensor_id="PZT-Z07")
     assert s2.zone_name == ZONE_SUBSTRUCTURE
 
     # Custom zone override
@@ -40,15 +40,15 @@ def test_virtual_pzt_invalid_init_parameters():
         VirtualPZTSensor(sensor_id="")
 
     with pytest.raises(ValueError, match="sample_rate_hz must be positive"):
-        VirtualPZTSensor(sensor_id="PZT-Z1-01", sample_rate_hz=0)
+        VirtualPZTSensor(sensor_id="PZT-Z01", sample_rate_hz=0)
 
     with pytest.raises(ValueError, match="initial_sequence cannot be negative"):
-        VirtualPZTSensor(sensor_id="PZT-Z1-01", initial_sequence=-5)
+        VirtualPZTSensor(sensor_id="PZT-Z01", initial_sequence=-5)
 
 
 def test_generate_payload_monotonic_sequence():
     """Verify sequence counter increments monotonically across payload calls."""
-    sensor = VirtualPZTSensor(sensor_id="PZT-Z1-01", initial_sequence=100)
+    sensor = VirtualPZTSensor(sensor_id="PZT-Z01", initial_sequence=100)
 
     p1 = sensor.generate_payload(mode="normal", sample_count=50)
     assert p1["sequence"] == 100
@@ -62,11 +62,11 @@ def test_generate_payload_monotonic_sequence():
 
 def test_payload_contract_adherence_and_backend_schema_validation():
     """Verify generated payload satisfies the backend TelemetryIngestRequest schema."""
-    sensor = VirtualPZTSensor(sensor_id="PZT-Z1-01", zone_name=ZONE_MAIN_DECK)
+    sensor = VirtualPZTSensor(sensor_id="PZT-Z01", zone_name=ZONE_MAIN_DECK)
     payload = sensor.generate_payload(mode="anomaly", sample_count=200, seed=42)
 
     # 1. Structural keys
-    assert payload["sensor_id"] == "PZT-Z1-01"
+    assert payload["sensor_id"] == "PZT-Z01"
     assert payload["zone_name"] == ZONE_MAIN_DECK
     assert payload["sample_rate_hz"] == 1000.0
     assert isinstance(payload["samples"], list)
@@ -90,14 +90,14 @@ def test_payload_contract_adherence_and_backend_schema_validation():
     # 3. Backend Pydantic validation (when available)
     if HAVE_BACKEND_SCHEMA:
         request_model = TelemetryIngestRequest(**payload)
-        assert request_model.sensor_id == "PZT-Z1-01"
+        assert request_model.sensor_id == "PZT-Z01"
         assert request_model.zone_name == ZONE_MAIN_DECK
         assert len(request_model.samples) == 200
 
 
 def test_generate_payload_custom_samples_and_overrides():
     """Verify custom samples and optional parameters (detection_threshold, session_id)."""
-    sensor = VirtualPZTSensor(sensor_id="PZT-Z1-02", zone_name=ZONE_MAIN_DECK)
+    sensor = VirtualPZTSensor(sensor_id="PZT-Z02", zone_name=ZONE_MAIN_DECK)
     custom_samples = [0.01, 0.02, 0.03, 0.04]
     custom_ts = datetime(2026, 9, 28, 14, 0, 0, tzinfo=timezone.utc)
 
@@ -116,6 +116,6 @@ def test_generate_payload_custom_samples_and_overrides():
 
 def test_generate_payload_unsupported_mode():
     """Verify error on unsupported signal mode."""
-    sensor = VirtualPZTSensor(sensor_id="PZT-Z1-01")
+    sensor = VirtualPZTSensor(sensor_id="PZT-Z01")
     with pytest.raises(ValueError, match="Unsupported signal mode"):
         sensor.generate_payload(mode="unknown_mode")

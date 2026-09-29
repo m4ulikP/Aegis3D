@@ -9,12 +9,22 @@ from typing import Dict, Optional
 ZONE_MAIN_DECK: str = "Zone 1 - Main Deck Girder"
 ZONE_SUBSTRUCTURE: str = "Zone 2 - Substructure Pier B"
 
-# Default sensor-to-zone associations conforming to backend consistency rules
+# Canonical sensor-to-zone associations (PZT-Z01…Z12).
+# Z01–Z06 → Zone 1 (Main Deck Girder / Level 2 floor system)
+# Z07–Z12 → Zone 2 (Substructure Pier B)
 DEFAULT_SENSOR_ZONE_MAP: Dict[str, str] = {
-    "PZT-Z1-01": ZONE_MAIN_DECK,
-    "PZT-Z1-02": ZONE_MAIN_DECK,
-    "PZT-Z2-01": ZONE_SUBSTRUCTURE,
-    "PZT-Z2-02": ZONE_SUBSTRUCTURE,
+    "PZT-Z01": ZONE_MAIN_DECK,
+    "PZT-Z02": ZONE_MAIN_DECK,
+    "PZT-Z03": ZONE_MAIN_DECK,
+    "PZT-Z04": ZONE_MAIN_DECK,
+    "PZT-Z05": ZONE_MAIN_DECK,
+    "PZT-Z06": ZONE_MAIN_DECK,
+    "PZT-Z07": ZONE_SUBSTRUCTURE,
+    "PZT-Z08": ZONE_SUBSTRUCTURE,
+    "PZT-Z09": ZONE_SUBSTRUCTURE,
+    "PZT-Z10": ZONE_SUBSTRUCTURE,
+    "PZT-Z11": ZONE_SUBSTRUCTURE,
+    "PZT-Z12": ZONE_SUBSTRUCTURE,
 }
 
 

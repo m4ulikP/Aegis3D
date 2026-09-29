@@ -16,7 +16,7 @@ def test_successful_telemetry_post():
     mock_response_data = {
         "status": "PROCESSED_ANOMALY_DETECTED",
         "telemetry_accepted": True,
-        "sensor_id": "PZT-Z1-01",
+        "sensor_id": "PZT-Z01",
         "zone_id": 1,
         "zone_name": "Zone 1 - Main Deck Girder",
         "timestamp": "2026-09-28T12:00:00Z",
@@ -41,7 +41,7 @@ def test_successful_telemetry_post():
     mock_resp.__enter__.return_value = mock_resp
 
     with patch("urllib.request.urlopen", return_value=mock_resp):
-        result = client.send_telemetry({"sensor_id": "PZT-Z1-01", "samples": [0.1]})
+        result = client.send_telemetry({"sensor_id": "PZT-Z01", "samples": [0.1]})
 
     assert result.success is True
     assert result.status_code == 200
@@ -60,7 +60,7 @@ def test_connection_failure_handled_cleanly():
 
     url_error = urllib.error.URLError(reason="Connection refused")
     with patch("urllib.request.urlopen", side_effect=url_error):
-        result = client.send_telemetry({"sensor_id": "PZT-Z1-01", "samples": [0.1]})
+        result = client.send_telemetry({"sensor_id": "PZT-Z01", "samples": [0.1]})
 
     assert result.success is False
     assert result.status_code == 0
@@ -73,7 +73,7 @@ def test_timeout_handled_cleanly():
     client = TelemetryClient(backend_url="http://192.168.1.50:8000", timeout_seconds=2.5)
 
     with patch("urllib.request.urlopen", side_effect=TimeoutError()):
-        result = client.send_telemetry({"sensor_id": "PZT-Z1-01", "samples": [0.1]})
+        result = client.send_telemetry({"sensor_id": "PZT-Z01", "samples": [0.1]})
 
     assert result.success is False
     assert result.status_code == 0
@@ -94,7 +94,7 @@ def test_http_404_error_parsed():
     )
 
     with patch("urllib.request.urlopen", side_effect=http_err):
-        result = client.send_telemetry({"sensor_id": "PZT-Z1-01", "zone_name": "Unknown", "samples": [0.1]})
+        result = client.send_telemetry({"sensor_id": "PZT-Z01", "zone_name": "Unknown", "samples": [0.1]})
 
     assert result.success is False
     assert result.status_code == 404
@@ -105,7 +105,7 @@ def test_http_400_error_parsed():
     """Verify HTTP 400 inconsistent sensor error parsing."""
     client = TelemetryClient(backend_url="http://localhost:8000")
 
-    err_body = json.dumps({"detail": "Sensor 'PZT-Z1-01' is inconsistent with target zone"}).encode("utf-8")
+    err_body = json.dumps({"detail": "Sensor 'PZT-Z01' is inconsistent with target zone"}).encode("utf-8")
     http_err = urllib.error.HTTPError(
         url="http://localhost:8000/api/v1/telemetry",
         code=400,
@@ -115,7 +115,7 @@ def test_http_400_error_parsed():
     )
 
     with patch("urllib.request.urlopen", side_effect=http_err):
-        result = client.send_telemetry({"sensor_id": "PZT-Z1-01", "zone_name": "Zone 2", "samples": [0.1]})
+        result = client.send_telemetry({"sensor_id": "PZT-Z01", "zone_name": "Zone 2 - Substructure Pier B", "samples": [0.1]})
 
     assert result.success is False
     assert result.status_code == 400

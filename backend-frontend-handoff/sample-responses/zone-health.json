@@ -1,0 +1,27 @@
+{
+  "zone_id": 1,
+  "score": 75.0,
+  "status": "MONITOR",
+  "trend": "STABLE",
+  "reason": "Elevated persistent anomalies detected in 60-minute window; cross-sensor correlation confirmed",
+  "timestamp": "2026-09-27T10:13:13.156161Z",
+  "evidence": {
+    "is_anomalous": true,
+    "is_persistent": true,
+    "is_cross_sensor": true,
+    "trend": "STABLE",
+    "anomalous_event_count": 4,
+    "total_event_count": 8,
+    "deductions": [
+      {
+        "category": "PERSISTENCE",
+        "points": 20.0
+      },
+      {
+        "category": "CROSS_SENSOR",
+        "points": 5.0
+      }
+    ]
+  },
+  "disclaimer": "SHI is a prototype evidence-based monitoring indicator derived from observed signal/event behavior. It is not a certified structural safety score and does not independently establish structural damage or failure."
+}

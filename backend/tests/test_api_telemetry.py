@@ -111,7 +111,7 @@ def test_post_telemetry_quiet_signal_no_event(client: TestClient, seeded_zones_c
     samples = (np.random.RandomState(42).normal(0.0, 0.05, 500)).tolist()
 
     payload = {
-        "sensor_id": "PZT-Z1-01",
+        "sensor_id": "PZT-Z01",
         "zone_name": seeded_zones_context["zone1_name"],
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "sample_rate_hz": 1000.0,
@@ -125,7 +125,7 @@ def test_post_telemetry_quiet_signal_no_event(client: TestClient, seeded_zones_c
     data = response.json()
     assert data["telemetry_accepted"] is True
     assert data["status"] == "PROCESSED_NO_EVENT"
-    assert data["sensor_id"] == "PZT-Z1-01"
+    assert data["sensor_id"] == "PZT-Z01"
     assert data["zone_id"] == seeded_zones_context["zone1_id"]
     assert data["events_detected"] == 0
     assert len(data["events"]) == 0
@@ -148,7 +148,7 @@ def test_post_telemetry_burst_signal_detects_event_and_persists(
     samples[300:400] = 4.5 * np.sin(2 * np.pi * 100 * t)
 
     payload = {
-        "sensor_id": "PZT-Z1-01",
+        "sensor_id": "PZT-Z01",
         "zone_name": seeded_zones_context["zone1_name"],
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "sample_rate_hz": 1000.0,
@@ -163,7 +163,7 @@ def test_post_telemetry_burst_signal_detects_event_and_persists(
     data = response.json()
     assert data["telemetry_accepted"] is True
     assert data["events_detected"] >= 1
-    assert data["sensor_id"] == "PZT-Z1-01"
+    assert data["sensor_id"] == "PZT-Z01"
     assert data["zone_id"] == seeded_zones_context["zone1_id"]
     assert data["extracted_features"] is not None
     assert data["extracted_features"]["peak_amplitude"] > 3.0
@@ -179,7 +179,7 @@ def test_post_telemetry_burst_signal_detects_event_and_persists(
     # Verify Event record in database
     db_evt = db_session.query(Event).filter(Event.id == evt["event_id"]).first()
     assert db_evt is not None
-    assert db_evt.source_id == "PZT-Z1-01"
+    assert db_evt.source_id == "PZT-Z01"
     assert db_evt.zone_id == seeded_zones_context["zone1_id"]
     assert db_evt.magnitude == pytest.approx(evt["magnitude"], rel=1e-3)
     assert db_evt.source_type == EventSourceType.SENSOR
@@ -188,7 +188,7 @@ def test_post_telemetry_burst_signal_detects_event_and_persists(
 def test_post_telemetry_unknown_zone_returns_404(client: TestClient):
     """Test telemetry targeting an unregistered zone returns HTTP 404."""
     payload = {
-        "sensor_id": "PZT-Z1-01",
+        "sensor_id": "PZT-Z01",
         "zone_name": "Nonexistent Roof Deck Section",
         "sample_rate_hz": 1000.0,
         "samples": [0.1, 0.2, 0.3],
@@ -200,9 +200,9 @@ def test_post_telemetry_unknown_zone_returns_404(client: TestClient):
 
 
 def test_post_telemetry_inconsistent_sensor_zone_returns_400(client: TestClient, seeded_zones_context: dict):
-    """Test sending Zone 1 sensor (PZT-Z1-01) to Zone 2 returns HTTP 400."""
+    """Test sending Zone 1 sensor (PZT-Z01) to Zone 2 returns HTTP 400."""
     payload = {
-        "sensor_id": "PZT-Z1-01",  # Sensor from Zone 1
+        "sensor_id": "PZT-Z01",  # Canonical Zone 1 sensor
         "zone_name": seeded_zones_context["zone2_name"],  # Zone 2 target
         "sample_rate_hz": 1000.0,
         "samples": [0.1, 0.2, 0.3],
@@ -216,7 +216,7 @@ def test_post_telemetry_inconsistent_sensor_zone_returns_400(client: TestClient,
 def test_post_telemetry_invalid_sample_rate_returns_422(client: TestClient, seeded_zones_context: dict):
     """Test sample_rate <= 0 returns HTTP 422."""
     payload = {
-        "sensor_id": "PZT-Z1-01",
+        "sensor_id": "PZT-Z01",
         "zone_name": seeded_zones_context["zone1_name"],
         "sample_rate_hz": -100.0,
         "samples": [0.1, 0.2, 0.3],
@@ -229,7 +229,7 @@ def test_post_telemetry_invalid_sample_rate_returns_422(client: TestClient, seed
 def test_post_telemetry_empty_samples_returns_422(client: TestClient, seeded_zones_context: dict):
     """Test empty samples list returns HTTP 422."""
     payload = {
-        "sensor_id": "PZT-Z1-01",
+        "sensor_id": "PZT-Z01",
         "zone_name": seeded_zones_context["zone1_name"],
         "sample_rate_hz": 1000.0,
         "samples": [],
@@ -242,7 +242,7 @@ def test_post_telemetry_empty_samples_returns_422(client: TestClient, seeded_zon
 def test_post_telemetry_sample_rate_alias(client: TestClient, seeded_zones_context: dict):
     """Test payload using 'sample_rate' field alias is accepted."""
     payload = {
-        "sensor_id": "PZT-Z2-01",
+        "sensor_id": "PZT-Z07",
         "zone_name": seeded_zones_context["zone2_name"],
         "sample_rate": 500.0,
         "samples": [0.01, 0.02, 0.01],
@@ -256,10 +256,10 @@ def test_post_telemetry_sample_rate_alias(client: TestClient, seeded_zones_conte
 def test_post_telemetry_zone2_multi_sensor_support(
     client: TestClient, seeded_zones_context: dict, db_session: Session
 ):
-    """Test multi-sensor routing to Zone 2 with PZT-Z2-01 and PZT-Z2-02."""
+    """Test multi-sensor routing to Zone 2 with PZT-Z07 and PZT-Z08."""
     # Sensor 1
     p1 = {
-        "sensor_id": "PZT-Z2-01",
+        "sensor_id": "PZT-Z07",
         "zone_name": seeded_zones_context["zone2_name"],
         "sample_rate_hz": 1000.0,
         "sequence": 1,
@@ -271,7 +271,7 @@ def test_post_telemetry_zone2_multi_sensor_support(
 
     # Sensor 2
     p2 = {
-        "sensor_id": "PZT-Z2-02",
+        "sensor_id": "PZT-Z08",
         "zone_name": seeded_zones_context["zone2_name"],
         "sample_rate_hz": 1000.0,
         "sequence": 1,
@@ -296,7 +296,7 @@ def test_get_latest_telemetry_empty_and_populated(
 
     # 2. Ingest telemetry
     payload = {
-        "sensor_id": "PZT-Z1-01",
+        "sensor_id": "PZT-Z01",
         "zone_name": seeded_zones_context["zone1_name"],
         "sample_rate_hz": 1000.0,
         "sequence": 42,
@@ -311,7 +311,7 @@ def test_get_latest_telemetry_empty_and_populated(
     assert latest_resp.status_code == 200
     data = latest_resp.json()
     assert data is not None
-    assert data["sensor_id"] == "PZT-Z1-01"
+    assert data["sensor_id"] == "PZT-Z01"
     assert data["zone_id"] == seeded_zones_context["zone1_id"]
     assert data["sequence"] == 42
     assert data["samples_count"] == 5
@@ -326,7 +326,7 @@ def test_get_latest_telemetry_bounded_samples(
     """Test that display samples returned in GET /latest are bounded to 500 items max."""
     large_samples = [float(i * 0.001) for i in range(1200)]
     payload = {
-        "sensor_id": "PZT-Z1-01",
+        "sensor_id": "PZT-Z01",
         "zone_name": seeded_zones_context["zone1_name"],
         "sample_rate_hz": 1000.0,
         "sequence": 99,
@@ -353,9 +353,9 @@ def test_get_latest_telemetry_multi_sensor_isolation(
     TelemetryService.clear_latest_telemetry()
     assert client.get("/api/v1/telemetry/latest").json() is None
 
-    # 2. Ingest PZT-Z1-01
+    # 2. Ingest PZT-Z01
     p1 = {
-        "sensor_id": "PZT-Z1-01",
+        "sensor_id": "PZT-Z01",
         "zone_name": seeded_zones_context["zone1_name"],
         "sample_rate_hz": 1000.0,
         "sequence": 10,
@@ -364,9 +364,9 @@ def test_get_latest_telemetry_multi_sensor_isolation(
     r1 = client.post("/api/v1/telemetry", json=p1)
     assert r1.status_code == 200
 
-    # 3. Ingest PZT-Z1-02
+    # 3. Ingest PZT-Z02
     p2 = {
-        "sensor_id": "PZT-Z1-02",
+        "sensor_id": "PZT-Z02",
         "zone_name": seeded_zones_context["zone1_name"],
         "sample_rate_hz": 1000.0,
         "sequence": 20,
@@ -375,30 +375,30 @@ def test_get_latest_telemetry_multi_sensor_isolation(
     r2 = client.post("/api/v1/telemetry", json=p2)
     assert r2.status_code == 200
 
-    # 4. Without query param: returns most recent sensor (PZT-Z1-02)
+    # 4. Without query param: returns most recent sensor (PZT-Z02)
     latest_general = client.get("/api/v1/telemetry/latest").json()
-    assert latest_general["sensor_id"] == "PZT-Z1-02"
+    assert latest_general["sensor_id"] == "PZT-Z02"
     assert latest_general["sequence"] == 20
     assert len(latest_general["samples"]) == 3
 
-    # 5. Query specifically for PZT-Z1-01: returns PZT-Z1-01 intact (not overwritten!)
-    z1_resp = client.get("/api/v1/telemetry/latest?sensor_id=PZT-Z1-01").json()
-    assert z1_resp["sensor_id"] == "PZT-Z1-01"
+    # 5. Query specifically for PZT-Z01: returns PZT-Z01 intact (not overwritten!)
+    z1_resp = client.get("/api/v1/telemetry/latest?sensor_id=PZT-Z01").json()
+    assert z1_resp["sensor_id"] == "PZT-Z01"
     assert z1_resp["sequence"] == 10
     assert len(z1_resp["samples"]) == 5
 
-    # 6. Query specifically for PZT-Z1-02: returns PZT-Z1-02 intact
-    z2_resp = client.get("/api/v1/telemetry/latest?sensor_id=PZT-Z1-02").json()
-    assert z2_resp["sensor_id"] == "PZT-Z1-02"
+    # 6. Query specifically for PZT-Z02: returns PZT-Z02 intact
+    z2_resp = client.get("/api/v1/telemetry/latest?sensor_id=PZT-Z02").json()
+    assert z2_resp["sensor_id"] == "PZT-Z02"
     assert z2_resp["sequence"] == 20
 
     # 7. Query unknown sensor: returns null
     unk_resp = client.get("/api/v1/telemetry/latest?sensor_id=PZT-UNKNOWN").json()
     assert unk_resp is None
 
-    # 8. Send updated packet for PZT-Z1-01 with sequence 11
+    # 8. Send updated packet for PZT-Z01 with sequence 11
     p1_update = {
-        "sensor_id": "PZT-Z1-01",
+        "sensor_id": "PZT-Z01",
         "zone_name": seeded_zones_context["zone1_name"],
         "sample_rate_hz": 1000.0,
         "sequence": 11,
@@ -406,14 +406,14 @@ def test_get_latest_telemetry_multi_sensor_isolation(
     }
     client.post("/api/v1/telemetry", json=p1_update)
 
-    # Verify PZT-Z1-01 is updated to seq 11
-    z1_updated = client.get("/api/v1/telemetry/latest?sensor_id=PZT-Z1-01").json()
+    # Verify PZT-Z01 is updated to seq 11
+    z1_updated = client.get("/api/v1/telemetry/latest?sensor_id=PZT-Z01").json()
     assert z1_updated["sequence"] == 11
     assert len(z1_updated["samples"]) == 2
 
-    # Verify PZT-Z1-02 was NOT affected (still seq 20)
-    z2_still = client.get("/api/v1/telemetry/latest?sensor_id=PZT-Z1-02").json()
+    # Verify PZT-Z02 was NOT affected (still seq 20)
+    z2_still = client.get("/api/v1/telemetry/latest?sensor_id=PZT-Z02").json()
     assert z2_still["sequence"] == 20
 
-    # Now general query returns PZT-Z1-01 as the most recent
-    assert client.get("/api/v1/telemetry/latest").json()["sensor_id"] == "PZT-Z1-01"
+    # Now general query returns PZT-Z01 as the most recent
+    assert client.get("/api/v1/telemetry/latest").json()["sensor_id"] == "PZT-Z01"

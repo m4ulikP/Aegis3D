@@ -1,0 +1,16 @@
+{
+  "id": 103,
+  "session_id": 1,
+  "zone_id": 1,
+  "source_type": "SENSOR",
+  "source_id": "PZT-01",
+  "correlation_id": null,
+  "timestamp": "2026-09-27T10:13:13.156161Z",
+  "magnitude": 3.2,
+  "energy": 25.0,
+  "duration_ms": 15.0,
+  "frequency_hz": 110000.0,
+  "severity": "LOW",
+  "status": "DETECTED",
+  "metadata": null
+}

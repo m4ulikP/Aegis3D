@@ -44,3 +44,7 @@ htmlcov/
 *.png
 data/processed/
 
+# Build & Agent Artifacts
+.gemini/
+*.tsbuildinfo
+*.rar

@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "health_snapshot_id": 5,
+    "zone_id": 1,
+    "timestamp": "2026-09-27T10:13:13.156161Z",
+    "severity": "MEDIUM",
+    "title": "Elevated Structural Activity",
+    "message": "Zone 1 exhibits persistent anomalous reflections",
+    "status": "ACTIVE",
+    "acknowledged_at": null,
+    "resolved_at": null
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "id": 1,
+  "name": "Zone 1 - North Wing",
+  "floor": "Floor 2",
+  "description": "Primary structural monitoring zone",
+  "created_at": "2026-09-27T10:13:13.156161Z",
+  "event_count": 14,
+  "active_alert_count": 1,
+  "latest_health_status": "MONITOR"
+}

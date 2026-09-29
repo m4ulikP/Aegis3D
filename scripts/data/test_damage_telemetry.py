@@ -85,9 +85,8 @@ DAMAGED_COMPONENT_GUID = (
     "1WrzGm1SD2ev45B_OWQ3El"
 )
 
-# The current backend demo database contains this sensor
-# in Zone 2.
-BACKEND_SENSOR_ID = "PZT-Z2-01"
+# The canonical sensor for Zone 2 (Substructure Pier B).
+BACKEND_SENSOR_ID = "PZT-Z07"
 
 BACKEND_ZONE_NAME = (
     "Zone 2 - Substructure Pier B"
