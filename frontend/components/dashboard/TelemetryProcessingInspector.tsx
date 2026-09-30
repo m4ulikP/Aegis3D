@@ -3792,16 +3792,22 @@ export default function TelemetryProcessingInspector({
         }
     }, [isOpen]);
 
-    // Progressive Presentation Queue sync: auto-advance currentStage unless user manually interacted in last 4s
+    // Distinguish LIVE backend processing from COMPLETED / historical inspection
+    // Auto-scroll / stage auto-advance is ONLY enabled during active live processing runs
+    const isLiveProcessing = (simulatorRunState === "PROCESSING" || simulatorRunState === "SENDING") && !isReplayingTrace;
+
+    // Progressive Presentation Queue sync: auto-advance currentStage ONLY during live backend processing
     useEffect(() => {
+        if (!isLiveProcessing) return;
+
         if (presentedStage && presentedStage >= 1 && presentedStage <= 9) {
             const timeSinceInteraction = Date.now() - userInteractedTimestampRef.current;
-            if (timeSinceInteraction > 4000 || isReplayingTrace) {
+            if (timeSinceInteraction > 4000) {
                 setNavDirection(presentedStage >= currentStage ? "next" : "prev");
                 setCurrentStage(presentedStage);
             }
         }
-    }, [presentedStage, isReplayingTrace, currentStage]);
+    }, [presentedStage, isLiveProcessing, currentStage]);
 
     // Keyboard ESC & Arrow Navigation listeners
     useEffect(() => {

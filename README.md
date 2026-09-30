@@ -224,458 +224,574 @@ $$\text{SHI} = \max(0.0, \min(100.0, \text{raw score}))$$
 
 ## Two-Laptop / Hackathon Setup
 
-Aegis3D supports a distributed deployment architecture designed for live hackathon evaluations, demonstrations, and multi-node benchtop hardware testing. In this configuration, **Laptop 1** acts as the authoritative central platform host (PostgreSQL database, FastAPI backend, LiveEventBus SSE stream, and Next.js 3D Digital Twin frontend), while **Laptop 2** acts as a standalone sensor telemetry node running the Virtual PZT Simulator over the local area network (LAN).
+Aegis3D supports a distributed deployment architecture designed for live hackathon evaluations, demonstrations, and multi-node benchtop hardware testing. In this configuration, **Laptop 1** acts as the central platform host (PostgreSQL database, FastAPI backend, LiveEventBus SSE stream, and Next.js 3D Digital Twin frontend), while **Laptop 2** acts as a standalone sensor telemetry node running the Virtual PZT Sensor Simulator over the local area network (LAN).
 
-> ℹ️ **Single-Backend Architecture**: The simulator on Laptop 2 is purely a lightweight client (`client.py`). It does **NOT** run a second FastAPI server or database. All telemetry ingested from Laptop 2 is processed centrally by Laptop 1's backend pipeline.
+> [!IMPORTANT]
+> **Single-Backend Architecture**: The simulator on Laptop 2 is purely a lightweight client (`client.py`). It does **NOT** run a second FastAPI backend server or database. Laptop 1's backend remains the sole authoritative engine for processing signals, evaluating baseline z-scores, managing state, computing SHI scores, and persisting final results.
 
-### 📐 Distributed Architecture
+---
+
+### 1. Architecture Overview
 
 ```text
-                    HACKATHON LAN
-                         │
-              ┌──────────┴──────────┐
-              │                     │
-          LAPTOP 1               LAPTOP 2
-        Aegis3D Host          Virtual PZT Simulator
-              │                     │
-       ┌──────┼──────┐              │
-       │      │      │              │
-   PostgreSQL FastAPI Next.js       │
-              │                     │
-              └──── HTTP ──────────┘
-                    telemetry
+Laptop 2
+Virtual PZT Simulator
+        |
+        | HTTP POST /api/v1/telemetry
+        | SSE/live processing where applicable
+        v
+   Local LAN / Wi-Fi
+        |
+        v
+Laptop 1
+FastAPI :8000
+        |
+        +---- PostgreSQL :5432
+        |
+        +---- Next.js :3000
+                  |
+                  +---- City Map
+                  +---- Digital Twin / BIM
 ```
 
-#### Communication Path
-```text
-Laptop 2 (Virtual PZT Simulator)
-    │
-    └── HTTP POST /api/v1/telemetry ──► Laptop 1:8000 ──► FastAPI Pipeline ──► PostgreSQL Database
-```
+#### Core Components & Responsibilities
+- **Laptop 1 — Platform Host**:
+  - **PostgreSQL Database** (`:5432`): Persistent relational store for zones, baselines, telemetry events, processing traces, health snapshots, and system alerts.
+  - **FastAPI Backend** (`:8000`): Authoritative processing engine. Ingests raw PZT voltage samples, runs the 9-stage signal pipeline, calculates z-scores ($|z| \ge 3.0$), tracks temporal persistence, evaluates 2-PZT TDOA correlation, computes bounded SHI scores, and streams real-time stage events over SSE (`/api/v1/telemetry/live`).
+  - **Next.js Dashboard** (`:3000`): Real-time engineering console rendering the 2.5D MapLibre City Map, 3D R3F Digital Twin (`building_demo.glb`), Telemetry Operations HUD, and continuous Processing Inspector.
+- **Laptop 2 — Virtual PZT Sensor Simulator**:
+  - Runs **only** the physics-based virtual sensor simulator (`simulator/main.py`).
+  - Generates discrete PZT voltage samples representing ambient normal noise, acoustic stress bursts, or multi-sensor correlation wavefronts.
+  - Transmits telemetry packets over the local network via HTTP `POST /api/v1/telemetry` to Laptop 1's FastAPI backend.
+
+#### Fundamental Networking Rules
+- Both laptops must be connected to the same LAN (Wi-Fi, Ethernet, or Mobile Hotspot) and able to reach Laptop 1 over the network.
+- **Laptop 1's IP address** is the critical runtime configuration value required by Laptop 2.
+- When the physical network changes (e.g. moving from home to a hackathon venue), Laptop 1's assigned IP address may change.
+- **Source code does NOT need to change** when the IP changes; only the simulator's runtime `BACKEND_URL` on Laptop 2 must point to Laptop 1's active IPv4 address.
 
 ---
 
-### 🌐 Network & IP Configuration Concept
+### 2. Prerequisites
 
-When transitioning between physical environments (e.g. from a home/office Wi-Fi network to a hackathon venue network or mobile hotspot), **Laptop 1's LAN IP address will change**.
+Ensure the following tools and environments are installed before setup:
 
-> **Important**: This IP change is completely normal. **Zero application source code changes are required.** Only the simulator's runtime configuration (`BACKEND_URL`) on Laptop 2 needs to point to Laptop 1's current active LAN IP address.
+#### Laptop 1 (Platform Host)
+- **Git** (for repository access)
+- **Python 3.10+** (with virtual environment support for backend dependencies)
+- **Docker Desktop & Docker Compose** (for running PostgreSQL container)
+- **Node.js 18+ & npm** (for building and serving the Next.js frontend)
+- **Aegis3D Repository** clone
 
-#### Example Network Scenario
-- **Home Network Example**:
-  - Laptop 1 LAN IP: `192.168.1.39`
-  - Laptop 2 LAN IP: `192.168.1.40`
-  - Target URL on Laptop 2: `BACKEND_URL=http://192.168.1.39:8000`
-- **Hackathon Venue Example**:
-  - Laptop 1 LAN IP: `10.42.0.15`
-  - Laptop 2 LAN IP: `10.42.0.22`
-  - Target URL on Laptop 2: `BACKEND_URL=http://10.42.0.15:8000`
+#### Laptop 2 (Simulator Host)
+- **Git** (for repository access)
+- **Python 3.10+** (for running the simulator)
+- **Simulator Dependencies** (`pip install -r simulator/requirements.txt`)
+- **Aegis3D Repository** clone
 
-*(Note: The IP addresses above are illustrative examples. Always use your network's actual assigned IP address represented by `<LAPTOP_1_IP>`).*
+#### Network Requirements
+- Both laptops must be connected to the exact same:
+  - Venue Wi-Fi network, **OR**
+  - Dedicated local router / Ethernet switch, **OR**
+  - Mobile phone / laptop Wi-Fi Hotspot.
 
-> ⚠️ **Crucial Networking Distinction**: Laptop 2 must **NEVER** use `127.0.0.1` or `localhost` when attempting to reach Laptop 1. On Laptop 2, `localhost` resolves to Laptop 2 itself, causing connection refused errors (`ECONNREFUSED`). Laptop 2 must always explicitly target `http://<LAPTOP_1_IP>:8000`.
-
----
-
-### 💻 Laptop 1 — Aegis3D Host Setup
-
-Execute the following numbered procedure on **Laptop 1**:
-
-1. **Connect to the Network**: Connect Laptop 1 to the venue Wi-Fi, Ethernet switch, or mobile hotspot.
-2. **Identify Laptop 1's Active LAN IPv4 Address**:
-   Open Windows PowerShell or Command Prompt and run:
-   ```cmd
-   ipconfig
-   ```
-   Locate the active Wi-Fi or Ethernet adapter and note its IPv4 Address:
-   ```text
-   Wireless LAN adapter Wi-Fi:
-      IPv4 Address . . . . . . . . . . . : 10.42.0.15
-   ```
-   In this example, `<LAPTOP_1_IP>` is `10.42.0.15`.
-
-3. **Start PostgreSQL Database**:
-   From the repository root on **Laptop 1**:
-   ```powershell
-   # Laptop 1
-   docker compose up -d postgres
-   ```
-   *(Ensures PostgreSQL is running on `localhost:5432` with standard database credentials)*.
-
-4. **Launch FastAPI Backend (Bind to All Interfaces)**:
-   From the `backend/` directory on **Laptop 1**:
-   ```powershell
-   # Laptop 1
-   cd backend
-   .\.venv\Scripts\activate
-   uvicorn app.main:app --host 0.0.0.0 --port 8000
-   ```
-   > ⚠️ **Binding Requirement**: Passing `--host 0.0.0.0` is mandatory. Binding to `127.0.0.1` restricts FastAPI to local loopback connections only, causing incoming HTTP requests from Laptop 2 to be rejected.
-
-5. **Verify FastAPI Binding on LAN**:
-   On **Laptop 1**, verify that FastAPI is actively listening on `0.0.0.0:8000`:
-   ```cmd
-   :: Laptop 1
-   netstat -ano | findstr :8000
-   ```
-   *Expected Output*: `TCP    0.0.0.0:8000           0.0.0.0:0              LISTENING`
-
-6. **Configure / Verify Windows Firewall (Port 8000)**:
-   Windows Firewall blocks incoming TCP connections on unlisted ports by default. To allow Laptop 2 to communicate with Laptop 1, run **ONE** of the following commands on **Laptop 1 as Administrator**:
-
-   - **Option A — Windows PowerShell (Admin)**:
-     ```powershell
-     # Laptop 1 (Admin PowerShell)
-     New-NetFirewallRule -DisplayName "Aegis3D FastAPI LAN" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8000 -Profile Private
-     ```
-
-   - **Option B — Command Prompt (Admin)**:
-     ```cmd
-     :: Laptop 1 (Admin CMD)
-     netsh advfirewall firewall add rule name="Aegis3D FastAPI LAN" dir=in action=allow protocol=TCP localport=8000 profile=private
-     ```
-
-   > **Security Note**: Disabling Windows Firewall entirely is strongly discouraged. Adding a targeted single-port rule for TCP 8000 on the Private profile preserves system security while enabling inter-laptop communication.
-   > 
-   > **Verification**: Verify the firewall rule in PowerShell:
-   > ```powershell
-   > Get-NetFirewallRule -DisplayName "Aegis3D FastAPI LAN"
-   > ```
-
-7. **Start Next.js Frontend Dashboard**:
-   From the `frontend/` directory on **Laptop 1**:
-   ```powershell
-   # Laptop 1
-   cd frontend
-   npm run dev
-   ```
-
-8. **Verify Dashboard & 3D Digital Twin**:
-   Open Google Chrome on **Laptop 1** and navigate to:
-   `http://localhost:3000/dashboard`
-   Verify that the 2.5D City Map, 3D Digital Twin model (`building_demo.glb`), and Telemetry HUD load completely.
+> [!WARNING]
+> **Client / AP Isolation Warning**: Many institutional, corporate, and public venue Wi-Fi networks enable **Client / AP Isolation** (also called Station Isolation). AP isolation prevents wireless devices on the same Wi-Fi network from communicating directly with each other, even though both laptops have working internet access. If AP isolation is active on the venue network, use the **Mobile Hotspot Backup** procedure documented below.
 
 ---
 
-### 🌐 Windows Network Profile & Wi-Fi Isolation Troubleshooting
+### 3. Step 1 — Identify Laptop IP Addresses
 
-#### Windows Network Category (Private vs Public)
-Windows Firewall applies different rules based on the network profile type (`Private` vs `Public`). On `Public` networks, Windows enforces strict inbound blocking.
+To configure inter-laptop communication, determine the active IPv4 addresses of both laptops on Windows using `ipconfig`.
 
-To check and update your Wi-Fi network profile on **Laptop 1**:
-1. Check current profile:
-   ```powershell
-   Get-NetConnectionProfile
-   ```
-2. If `NetworkCategory` shows `Public` and Windows permits modification, change it to `Private` in **Elevated Administrator PowerShell**:
-   ```powershell
-   # Laptop 1 (Admin PowerShell)
-   Set-NetConnectionProfile -InterfaceAlias "Wi-Fi" -NetworkCategory Private
-   ```
-3. Re-verify:
-   ```powershell
-   Get-NetConnectionProfile
-   ```
-
-> ⚠️ **Managed Network Note**: Windows may prevent changing `NetworkCategory` if the machine is restricted by domain Group Policy or elevated administrator policy. If `Set-NetConnectionProfile` fails or is blocked, do not force registry modifications. Instead, investigate whether venue Wi-Fi AP isolation or guest-network policies are preventing device communication.
-
-#### Wi-Fi Client / AP Isolation
-Some venue Wi-Fi networks (and public guest networks) enable **Client AP Isolation**, which intentionally prevents wireless devices on the same Wi-Fi network from communicating with one another.
-
-- **Symptoms**:
-  - Both Laptop 1 and Laptop 2 have valid `192.168.x.x` or `10.x.x.x` IP addresses and internet access.
-  - `ping <LAPTOP_1_IP>` from Laptop 2 fails (`Destination host unreachable` or `Request timed out`).
-  - `Test-NetConnection <LAPTOP_1_IP> -Port 8000` fails (`TcpTestSucceeded : False`).
-- **Underlying Causes**: AP Isolation, Client Isolation, Wireless Station Isolation, or Guest Network Isolation configured on the venue router.
-- **Action**: Ask venue network administrators if device-to-device LAN traffic is permitted. If AP isolation is active, switch immediately to the **Mobile Hotspot Backup** method described below.
-
----
-
-### 💻 Laptop 2 — Virtual PZT Simulator Setup
-
-Execute the following procedure on **Laptop 2**:
-
-1. **Connect to the Same Network**: Ensure Laptop 2 is connected to the exact same Wi-Fi, Ethernet, or mobile hotspot network as Laptop 1.
-2. **Verify Python Environment**:
-   From the `simulator/` directory on **Laptop 2**:
-   ```powershell
-   # Laptop 2
-   cd simulator
-   python -m venv .venv
-   .\.venv\Scripts\activate      # Windows
-   # source .venv/bin/activate   # Linux/macOS
-   pip install -r requirements.txt
-   ```
-
-3. **Configure `BACKEND_URL`**:
-   The simulator accepts Laptop 1's base URL (`http://<LAPTOP_1_IP>:8000`) through either a command-line flag or an environment variable file:
-
-   - **Method A — CLI Flag (Recommended for Quick Demos)**:
-     Pass `--backend-url http://<LAPTOP_1_IP>:8000` directly to `main.py`.
-   
-   - **Method B — `.env` Configuration File**:
-     Create `simulator/.env` (copied from `simulator/.env.example`) and set:
-     ```env
-     BACKEND_URL=http://<LAPTOP_1_IP>:8000
-     ```
-
-   > **URL Distinction**: `BACKEND_URL` represents the base URL of the FastAPI server (e.g. `http://10.42.0.15:8000`). **Do not** append `/api/v1/telemetry` to `BACKEND_URL`; the simulator client (`client.py`) automatically appends `/api/v1/telemetry` for HTTP POST ingestion and `/api/v1/telemetry/live` for SSE stream tracking.
-
-4. **Verify Connectivity to Laptop 1**:
-   Run the connectivity test from **Laptop 2** (see details below).
-
-5. **Run Simulator Telemetry**:
-   Transmit discrete PZT telemetry packets from **Laptop 2** to **Laptop 1**:
-   ```powershell
-   # Laptop 2
-   python main.py --mode anomaly --sensor PZT-Z01 --backend-url http://<LAPTOP_1_IP>:8000 --batches 1
-   ```
-
----
-
-### 🔌 Verify Laptop-to-Laptop Connectivity Sequence
-
-Before launching continuous telemetry streaming, execute this exact 3-step diagnostic sequence from **Laptop 2**:
-
-#### Step 1: Network Layer Ping Test
-From **Laptop 2** command line:
+#### On Laptop 1 (Platform Host)
+Open PowerShell or Command Prompt and run:
 ```cmd
-:: Laptop 2
-ping <LAPTOP_1_IP>
+ipconfig
 ```
-- **Expected Output**: `Reply from <LAPTOP_1_IP>: bytes=32 time<5ms TTL=128` (`PingSucceeded : True`).
-- **If Ping Fails (`Destination host unreachable` / `Request timed out`)**:
-  - *Interpretation*: This is a physical LAN / Wi-Fi layer connectivity issue, **NOT** a FastAPI or application bug.
-  - *Fix*: Check Wi-Fi connections, verify both laptops are on the same subnet, test reverse ping from Laptop 1 (`ping <LAPTOP_2_IP>`), and check for Wi-Fi AP isolation.
+Locate the active network adapter (e.g., `Wireless LAN adapter Wi-Fi` or `Ethernet adapter`).
 
-#### Step 2: TCP Port 8000 Layer Test
-From **Laptop 2** PowerShell:
+*Example Output*:
+```text
+Wireless LAN adapter Wi-Fi:
+   Connection-specific DNS Suffix  . :
+   IPv4 Address. . . . . . . . . . . : 192.168.1.39
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Default Gateway . . . . . . . . . : 192.168.1.1
+```
+In this example, **Laptop 1 IPv4 = `192.168.1.39`**.
+
+#### On Laptop 2 (Simulator Host)
+Open PowerShell or Command Prompt and run:
+```cmd
+ipconfig
+```
+*Example Output*:
+```text
+Wireless LAN adapter Wi-Fi:
+   IPv4 Address. . . . . . . . . . . : 192.168.1.40
+```
+In this example, **Laptop 2 IPv4 = `192.168.1.40`**.
+
+> [!IMPORTANT]
+> - The IP addresses above (`192.168.1.39` and `192.168.1.40`) are **examples only** and **MUST NOT be hardcoded**. Always identify the actual assigned IPv4 address on your current network.
+> - **Do NOT use `127.0.0.1` or `localhost` from Laptop 2 when referring to Laptop 1**. On Laptop 2, `localhost` resolves locally to Laptop 2 itself, resulting in connection refused errors (`ECONNREFUSED`). Laptop 2 must explicitly target Laptop 1's LAN IPv4 address (e.g. `http://192.168.1.39:8000`).
+
+---
+
+### 4. Step 2 — Start PostgreSQL on Laptop 1
+
+PostgreSQL stores domain entities, baselines, raw events, processing traces, health snapshots, and active alerts. PostgreSQL **must** be running before launching the FastAPI backend.
+
+From the repository root on **Laptop 1**:
 ```powershell
-# Laptop 2 (PowerShell)
-Test-NetConnection -ComputerName <LAPTOP_1_IP> -Port 8000
+# Laptop 1 (Repository Root)
+docker compose up -d postgres
 ```
-- **Expected Output**: `TcpTestSucceeded : True`
-- **If `TcpTestSucceeded : False` while Ping Succeeds**:
-  - *Interpretation*: The network layer is functional, but TCP port 8000 is blocked or FastAPI is not listening on `0.0.0.0`.
-  - *Fix*: On Laptop 1, verify `netstat -ano | findstr :8000` shows `0.0.0.0:8000 LISTENING` and verify the `Aegis3D FastAPI LAN` firewall rule.
 
-#### Step 3: Application HTTP Layer Test
-From **Laptop 2** browser or command line:
-1. **Interactive OpenAPI Docs**: Open `http://<LAPTOP_1_IP>:8000/docs` in a browser on Laptop 2.
-2. **Backend Liveness Health Check**:
+#### Verification
+Verify PostgreSQL container liveness and database port (`5432`) binding:
+```powershell
+docker compose ps
+```
+*Expected Output*: `aegis3d-postgres` container in `Up` or `running` state with port `5432->5432/tcp`.
+
+---
+
+### 5. Step 3 — Start FastAPI on Laptop 1
+
+The FastAPI backend executes signal conditioning, feature extraction, z-score anomaly scoring, and SSE stream broadcasting.
+
+From the `backend/` directory on **Laptop 1**:
+```powershell
+# Laptop 1
+cd backend
+.\.venv\Scripts\activate
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+> [!IMPORTANT]
+> **Why `--host 0.0.0.0` is Mandatory**:
+> Binding Uvicorn to `127.0.0.1` (or `localhost`) restricts the server to local loopback connections on Laptop 1 only. Binding to `0.0.0.0` instructs FastAPI to listen on **all network interfaces**, allowing incoming HTTP requests from Laptop 2 over the local network.
+
+#### Health Verification Checks
+1. **Laptop 1 Local Loopback Liveness**:
+   Open a browser or terminal on Laptop 1:
    ```cmd
-   :: Laptop 2
-   curl.exe http://<LAPTOP_1_IP>:8000/health
+   curl.exe http://127.0.0.1:8000/health
    ```
    *Expected Response*: `{"status":"healthy","service":"aegis3d-backend"}`
 
-> **Connectivity Conclusion**: If `http://<LAPTOP_1_IP>:8000/docs` opens successfully on Laptop 2, basic HTTP network communication to FastAPI is 100% verified.
+2. **Laptop 1 Database Liveness**:
+   ```cmd
+   curl.exe http://127.0.0.1:8000/health/db
+   ```
+   *Expected Response*: `{"status":"healthy","database":"connected"}`
+
+3. **Laptop 1 LAN Interface Check**:
+   Test accessing the endpoint using Laptop 1's active LAN IPv4 address from Laptop 1:
+   ```cmd
+   curl.exe http://<LAPTOP1_IP>:8000/health
+   ```
+   *Example*: `curl.exe http://192.168.1.39:8000/health`  
+   *(Replace `192.168.1.39` with Laptop 1's actual LAN IPv4).*
 
 ---
 
-### 🎯 Canonical Sensor Selection & Zone Semantics
+### 6. Step 4 — Windows Firewall Configuration
 
-Aegis3D maintains strict identity consistency based on the authoritative BIM sensor registry (`data/processed/bim/sensor_registry.json`). When selecting sensors for telemetry injection, use **ONLY** canonical IDs (`PZT-Z01` through `PZT-Z12`):
+Windows Firewall blocks incoming TCP network traffic on unlisted ports by default. To allow Laptop 2 to send HTTP requests to FastAPI on port 8000, create an inbound firewall rule on Laptop 1.
 
-| Sensor ID Range | Storey | Monitored Structural Zone | Ingestion & SHI Status |
+Run the following command in **PowerShell as Administrator** on **Laptop 1**:
+```powershell
+# Laptop 1 (Elevated Admin PowerShell)
+New-NetFirewallRule -DisplayName "Aegis3D FastAPI LAN" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow -Profile Private
+```
+
+#### Why This Configuration is Used
+- **Targeted Port Exposure**: Allows inbound TCP connections strictly on port `8000`.
+- **Private Profile Scoping**: Restricts rule application to trusted `Private` network profiles.
+- **Security Compliance**: Avoids turning off Windows Firewall globally. Never disable Windows Firewall entirely.
+
+#### Windows Network Profile Verification (Private vs Public)
+Windows Firewall applies strict inbound blocking when a network is classified as `Public`. To verify and adjust the network profile on **Laptop 1**:
+1. Check current network profile:
+   ```powershell
+   Get-NetConnectionProfile
+   ```
+2. If `NetworkCategory` displays `Public` and policy permits, change it to `Private` in Admin PowerShell:
+   ```powershell
+   Set-NetConnectionProfile -InterfaceAlias "Wi-Fi" -NetworkCategory Private
+   ```
+
+#### Rule Inspection Command
+To verify that the rule exists and is active on Laptop 1:
+```powershell
+Get-NetFirewallRule -DisplayName "Aegis3D FastAPI LAN"
+```
+*Expected Output*: Displays rule properties showing `Enabled : True`, `Direction : Inbound`, `Action : Allow`, `LocalPort : 8000`.
+
+---
+
+### 7. Step 5 — Verify Laptop-to-Laptop Connectivity
+
+Before starting the simulator on Laptop 2, run this systematic connectivity verification sequence from **Laptop 2**.
+
+#### 1. TCP Port 8000 Verification (Strongest Diagnostic Test)
+From **Laptop 2** PowerShell:
+```powershell
+# Laptop 2 (PowerShell)
+Test-NetConnection <LAPTOP1_IP> -Port 8000
+```
+*Example*: `Test-NetConnection 192.168.1.39 -Port 8000`
+
+- **Expected Key Result**:
+  ```text
+  TcpTestSucceeded : True
+  ```
+
+#### 2. Network Layer Ping Verification
+From **Laptop 2** command line:
+```cmd
+:: Laptop 2
+ping <LAPTOP1_IP>
+```
+> [!NOTE]
+> Ping uses the ICMP protocol. A ping failure (`Request timed out` or `Destination host unreachable`) does **NOT** necessarily mean TCP connectivity is broken, as ICMP echo requests are frequently blocked by default network security policies. Always rely on `Test-NetConnection` as the definitive TCP test.
+
+#### 3. Application Layer HTTP Health Verification
+From **Laptop 2** command line or browser:
+```cmd
+:: Laptop 2
+curl.exe http://<LAPTOP1_IP>:8000/health
+```
+*Expected Output*: `{"status":"healthy","service":"aegis3d-backend"}`
+
+#### Connectivity Diagnostic Logic
+- **If `Test-NetConnection` fails (`TcpTestSucceeded : False`)**:
+  $\rightarrow$ Investigate physical LAN connection, IP address accuracy, Windows Firewall rules, Uvicorn `0.0.0.0` binding, or Wi-Fi AP isolation **before** modifying simulator code.
+- **If `Test-NetConnection` succeeds (`True`) but `/health` fails (HTTP 500/timeout)**:
+  $\rightarrow$ Investigate FastAPI server execution, backend Python environment, or PostgreSQL database state on Laptop 1.
+- **If `/health` returns `200 OK`**:
+  $\rightarrow$ Network path and FastAPI port binding are 100% verified and functional.
+
+---
+
+### 8. Step 6 — Configure the Simulator on Laptop 2
+
+Configure the simulator on **Laptop 2** to direct all telemetry ingestion requests to Laptop 1's active FastAPI IP address.
+
+#### Configuration Methods
+
+- **Method A — Command-Line Flag (Recommended for Live Hackathon Demos)**:
+  Pass `--backend-url http://<LAPTOP1_IP>:8000` directly to `main.py`:
+  ```bash
+  python main.py --mode normal --sensor PZT-Z01 --backend-url http://192.168.1.39:8000 --batches 1
+  ```
+
+- **Method B — Environment Configuration File (`simulator/.env`)**:
+  Create or edit `simulator/.env` (copied from `simulator/.env.example`):
+  ```env
+  BACKEND_URL=http://192.168.1.39:8000
+  ```
+
+#### Critical Configuration Rules
+- **Replace Example IP**: Replace `192.168.1.39` with Laptop 1's **current IPv4 address**.
+- **Do NOT use `localhost` or `127.0.0.1`**: On Laptop 2, `localhost` points back to Laptop 2.
+- **Do NOT hardcode example IPs permanently**: When moving between networks, update `BACKEND_URL` to reflect Laptop 1's new IP.
+- **Runtime Configuration Only**: Changing `BACKEND_URL` is a runtime parameters update; source code modification is unnecessary.
+- **Do NOT append `/api/v1/telemetry`**: Set `BACKEND_URL` to the base server origin (e.g. `http://192.168.1.39:8000`). The simulator client automatically appends REST endpoints (`/api/v1/telemetry` and `/api/v1/telemetry/live`).
+
+---
+
+### 9. Step 7 — Start the Next.js Dashboard
+
+The Next.js frontend dashboard provides real-time GIS city mapping, 3D Digital Twin BIM visualization, telemetry HUD instrumentation, and the continuous Processing Inspector. The dashboard normally runs on **Laptop 1**.
+
+From the `frontend/` directory on **Laptop 1**:
+```powershell
+# Laptop 1
+cd frontend
+npm run dev
+```
+
+#### Expected Access URL
+Open Google Chrome on **Laptop 1** and navigate to:
+[http://localhost:3000/dashboard](http://localhost:3000/dashboard)
+
+> [!CAUTION]
+> **Build Lifecycle Conflict Warning**:
+> Do **NOT** execute `npm run build` while `npm run dev` is actively running against the same `frontend/.next` build directory. Running development and production build processes concurrently corrupts Next.js webpack compilation artifacts.
+
+#### Known Issue & Recovery: `Error: Cannot find module './682.js'`
+If `npm run build` was executed while `npm run dev` was running, or if stale webpack chunks persist in `.next`, Next.js will crash with an unhandled server error referencing missing module chunks (e.g., `Error: Cannot find module './682.js'`).
+
+**Standard Recovery Procedure**:
+1. Stop the active Next.js development server (`Ctrl + C` in Laptop 1 terminal).
+2. Stop any orphaned Node processes if necessary (`Get-Process node | Stop-Process` in PowerShell).
+3. Delete **ONLY** the build cache directory `frontend/.next`:
+   ```powershell
+   # Laptop 1 (frontend directory)
+   Remove-Item -Recurse -Force .next
+   ```
+4. Restart the development server:
+   ```powershell
+   npm run dev
+   ```
+5. Reload `http://localhost:3000/dashboard` in the browser.
+
+#### Production Testing Guidelines
+If production bundle testing is explicitly required:
+1. Stop the dev server (`npm run dev`) completely.
+2. Run production compilation: `npm run build`.
+3. Start production server: `npm run start`.
+
+---
+
+### 10. Step 8 — Start the Simulator on Laptop 2
+
+Launch the physics-based PZT Virtual Sensor Simulator on **Laptop 2** to transmit telemetry packets over the LAN to Laptop 1 (`POST /api/v1/telemetry`).
+
+From the `simulator/` directory on **Laptop 2**:
+```powershell
+# Laptop 2
+cd simulator
+.\.venv\Scripts\activate
+python main.py --mode normal --sensor PZT-Z01 --backend-url http://<LAPTOP1_IP>:8000 --batches 1
+```
+
+#### Canonical Sensor Registry Rules
+Aegis3D enforces strict identity matching based on `data/processed/bim/sensor_registry.json`. Use **ONLY** valid canonical sensor IDs:
+
+| Sensor ID Range | Storey | Monitored Structural Zone | Application Behavior |
 | :--- | :--- | :--- | :--- |
-| **PZT-Z01 – PZT-Z04** | `01 - Entry Level` | **Zone 2** (`Zone 2 - Substructure Pier B`, ID: 2) | **Active Monitoring Zone** (Full SHI & Alert pipeline) |
-| **PZT-Z05 – PZT-Z08** | `02 - Floor` | **Zone 1** (`Zone 1 - Main Deck Girder`, ID: 1) | **Active Monitoring Zone** (Full SHI & Alert pipeline) |
-| **PZT-Z09 – PZT-Z12** | `03 - Floor` | *None* (Intentionally Unassigned) | **Valid Canonical Sensors** (Blocked from Zone 1/2 with HTTP 400; no SHI or alerts) |
+| **`PZT-Z01` – `PZT-Z04`** | `01 - Entry Level` | **Zone 2** (`Zone 2 - Substructure Pier B`) | Active monitoring zone; updates SHI and alerts |
+| **`PZT-Z05` – `PZT-Z08`** | `02 - Floor` | **Zone 1** (`Zone 1 - Main Deck Girder`) | Active monitoring zone; updates SHI and alerts |
+| **`PZT-Z09` – `PZT-Z12`** | `03 - Floor` | *Unassigned* | Valid Storey 03 canonical sensors unassigned to active monitoring zones (returns `HTTP 400 Bad Request` if submitted against Zone 1 or Zone 2) |
 
-> ⚠️ **Retired Sensor IDs**: Never use retired legacy IDs (`PZT-Z1-01`, `PZT-Z1-02`, `PZT-Z2-01`, `PZT-Z2-02`). They are completely removed from the codebase.
-> 
-> **Active Demonstration Recommendation**: For live telemetry demonstrations, use **`PZT-Z01`** (Zone 2 default) or **`PZT-Z05`** (Zone 1). `PZT-Z09`–`PZT-Z12` are valid Storey 03 canonical sensors that are intentionally unassigned from active backend monitoring zones and will return `HTTP 400 Bad Request` if submitted against Zone 1 or Zone 2.
-
----
-
-### 🚀 Live Simulator Commands Runbook
-
-Use these exact verified commands on **Laptop 2** to transmit representative telemetry signals during live demonstrations:
-
-#### 1. Normal / Healthy Baseline Telemetry (`--mode normal`)
-Transmits low-amplitude background ambient noise ($\mu = 0.0, \sigma = 0.04$) and subtle harmonic structural vibration well below activity detection thresholds:
-```bash
-# Laptop 2
-python main.py --mode normal --sensor PZT-Z01 --backend-url http://<LAPTOP_1_IP>:8000 --batches 1
-```
-- **Expected Backend Behavior**: FastAPI ingests packet -> signal conditioning removes DC offset -> event detection threshold is not met -> status `PROCESSED_NO_EVENT` (0 events detected, no database event record created).
-
-#### 2. Anomaly / Structural Stress Wave Telemetry (`--mode anomaly`)
-Transmits high-amplitude acoustic stress wave burst telemetry ($\text{peak} \approx 4.5$) with exponential ringdown decay:
-```bash
-# Laptop 2
-python main.py --mode anomaly --sensor PZT-Z05 --backend-url http://<LAPTOP_1_IP>:8000 --batches 1
-```
-- **Expected Backend Behavior**:
-  - The simulator generates discrete sample values; it does **NOT** hardcode an `is_anomalous=true` flag.
-  - Laptop 1's backend pipeline independently detects the burst activity, extracts peak/RMS/energy/FFT features, computes baseline deviation ($|z| \ge 3.0\sigma$), updates temporal persistence, evaluates SHI penalties, and dispatches alerts if warranted.
-
-#### 3. 2-PZT Cross-Sensor Correlation Telemetry (`--mode correlation`)
-Transmits physically coordinated waveforms across `PZT-Z05` (primary burst) and `PZT-Z06` (secondary burst, +5 ms TDOA delay) in Zone 1:
-```bash
-# Laptop 2
-python main.py --mode correlation --backend-url http://<LAPTOP_1_IP>:8000 --batches 1
-```
-- **Expected Backend Behavior**: Backend groups both events within the 25 ms coincidence window, confirms `cross_sensor_correlation_confirmed: true`, and determines relative arrival lead time.
-
-#### 4. Multi-Batch Stream (`--batches 5`)
-Transmits 5 sequential telemetry batches spaced 1.0 second apart:
-```bash
-# Laptop 2
-python main.py --mode anomaly --sensor PZT-Z05 --backend-url http://<LAPTOP_1_IP>:8000 --batches 5 --interval 1.0
-```
-- **Expected Backend Behavior**: Demonstrates rolling temporal persistence ratio evaluation, live SSE stage stream progression, and progressive SHI penalty accumulation.
-
-> 🔬 **Hardware Roadmap Note**: The simulator modes (`normal`, `transient`, `anomaly`, `correlation`) represent software-driven signal generation for prototyping and hackathon demonstration. Future physical hardware iterations will stream direct ADC voltage samples from benchtop ESP32 microcontrollers attached to physical PZT transducers.
+> [!WARNING]
+> **Retired Sensor IDs**: Never use retired legacy sensor identifiers (such as `PZT-Z1-01`, `PZT-Z1-02`, `PZT-Z2-01`, `PZT-Z2-02`). They are completely removed from the schema and codebase.
 
 ---
 
-### ▶️ Full Hackathon Demo Startup Order
+### 11. Step 9 — Run a Healthy Test
 
-For a smooth presentation, start components in the following exact order:
+Verify baseline normal operations using low-amplitude background noise telemetry.
+
+From **Laptop 2**:
+```bash
+# Laptop 2
+python main.py --mode normal --sensor PZT-Z01 --backend-url http://<LAPTOP1_IP>:8000 --batches 1
+```
+
+#### Expected Behavior & Results
+- **Simulator Terminal Output (Laptop 2)**:
+  `[SUCCESS] Telemetry accepted by backend (Status: 200 OK)`
+- **Backend Log Output (Laptop 1)**:
+  `POST /api/v1/telemetry 200 OK` processed in sub-15 ms with status `PROCESSED_NO_EVENT`.
+- **Healthy Telemetry Parameters**:
+  - Signal amplitude remains below event detection threshold ($V_{\text{thresh}}$).
+  - Detected events: `0`.
+  - Active alerts: `0` (no alerts triggered).
+  - Zone Structural Health Indicator (SHI): Maintains **`100.0`** (`NORMAL`).
+- **Verification Locations**:
+  - Laptop 2 simulator CLI output.
+  - Laptop 1 FastAPI Uvicorn logs.
+  - Laptop 1 Next.js Telemetry HUD (`http://localhost:3000/dashboard`).
+  - Laptop 1 3D Digital Twin (Zone 2 remains green).
+
+---
+
+### 12. Step 10 — Run an Anomaly Test
+
+Verify stress wave detection, z-score evaluation, temporal persistence tracking, alert generation, and 3D Digital Twin highlighting.
+
+From **Laptop 2**:
+```bash
+# Laptop 2
+python main.py --mode anomaly --sensor PZT-Z05 --backend-url http://<LAPTOP1_IP>:8000 --batches 1
+```
+
+#### Complete Telemetry Execution Chain
+```text
+Laptop 2 Simulator
+   │ Transmits high-amplitude PZT burst telemetry (peak ≈ 4.5V)
+   ▼
+Laptop 1 FastAPI Backend
+   │ 1. Ingestion & DC offset subtraction
+   │ 2. 4th-order Butterworth lowpass filtering
+   │ 3. Contiguous sample event window detection
+   │ 4. Spectral feature extraction (Peak, RMS, Energy, FFT dominant frequency)
+   │ 5. Baseline reference z-score computation (|z| ≥ 3.0)
+   │ 6. Temporal persistence ratio tracking
+   │ 7. Health score deduction & alert evaluation
+   │ 8. LiveEventBus broadcasts SSE stage events
+   ▼
+Laptop 1 Dashboard & 3D Digital Twin
+   │ 1. Telemetry HUD updates waveform trace and status
+   │ 2. Processing Inspector advances through stages 1 → 9
+   │ 3. Active alert banner appears for Zone 1
+   │ 4. 3D Digital Twin highlights Storey 02 / Main Deck Girder in red
+```
+
+#### Technical Terminology & Engineering Boundaries
+- **Correct System Description**: Structural acoustic stress wave anomaly detected; baseline statistical deviation $|z| \ge 3.0$; structural inspection advised; zone/component-level BIM element highlighting updated.
+- **Engineering Boundaries**: Aegis3D does **NOT** image cracks, calculate 2D/3D crack coordinates, predict structural collapse, or provide certified structural safety compliance ratings.
+
+---
+
+### 13. Step 11 — Verify Real-Time Processing / SSE
+
+Verify that the client-side **Processing Inspector** (`TelemetryProcessingInspector.tsx`) receives real backend processing evidence via Server-Sent Events (`GET /api/v1/telemetry/live`).
+
+#### Pipeline Stage Lifecycle
+The authoritative backend executes the 9 processing stages sequentially:
+1. `INGESTION`
+2. `CONDITIONING`
+3. `EVENT DETECTION`
+4. `FEATURE EXTRACTION`
+5. `BASELINE`
+6. `ANOMALY`
+7. `PERSISTENCE`
+8. `CORRELATION`
+9. `HEALTH / ALERT`
+
+#### Client Presentation Lifecycle
+- **Stage Progression State**: `READY` $\rightarrow$ `SENDING/TRANSMITTING` $\rightarrow$ `PROCESSING` $\rightarrow$ `SUCCESS` $\rightarrow$ `READY`.
+- **Frontend Dwell Pacing**: Real backend processing completes in 5–15 ms. The frontend queue presents events with human-readable dwell timing (~350–500 ms per stage) while displaying actual backend execution duration in status badges (e.g., `STAGE 04 (12ms)`).
+- **Automatic Page 1 Reset**: Upon receiving `PROCESSING_COMPLETED`, the Processing Inspector fetches the completed authoritative trace (`GET /api/v1/telemetry/{id}/processing-trace`) and **automatically snaps view pagination to Page 1 (Ingestion)**.
+- **Completed Trace Inspection**: Presenters can manually click pagination controls (Pages 1 $\rightarrow$ 9) to inspect evidence without triggering additional backend processing.
+
+---
+
+### 14. Step 12 — Verify Dashboard + Digital Twin
+
+After transmitting an anomaly packet from Laptop 2, verify visual updates across Laptop 1's dashboard:
+
+#### Dashboard Engineering Console Checkpoints
+1. **Active Alert Banner**: System Alert panel displays an active warning for **Zone 1** (`Zone 1 - Main Deck Girder`).
+2. **Zone Health Summary**: Structural Health Indicator drops below 100.0, displaying `INSPECTION_ADVISED` or `HIGH_PRIORITY_INSPECTION`.
+3. **2.5D City Map**: Building footprint polygon in Delhi updates visual status to reflect active alert condition.
+4. **3D Digital Twin BIM Viewer**:
+   - Storey `02 - Floor` / `Zone 1 - Main Deck Girder` is highlighted with structural anomaly color coding (amber/red).
+   - Component structural groups highlight associated girder elements based on zone BIM mapping.
+
+#### Inferred Zone Mapping Limitations
+- Digital Twin highlighting maps anomalies to **zone-level and structural group-level BIM elements**.
+- Highlighting does **NOT** represent exact physical crack coordinates or millimeter-level PZT surface locations.
+- Missing telemetry packets or disconnected backend connections must not be interpreted as `HEALTHY`; the dashboard explicitly distinguishes `OFFLINE` status from healthy baseline operations.
+
+#### Alert Clearing Behavior
+When active alerts are dismissed or cleared via the API (`POST /api/v1/alerts/{id}/clear`), active alert banners dissolve and Digital Twin visual highlights revert to baseline status.
+
+---
+
+### 15. If the Wi-Fi Network or IP Address Changes
+
+When moving between network locations (e.g. from home to hackathon venue, or switching Wi-Fi networks):
+
+1. Connect both Laptop 1 and Laptop 2 to the new network.
+2. Run `ipconfig` on **Laptop 1** to identify the new IPv4 address (e.g., `10.42.0.15`).
+3. Verify Uvicorn on Laptop 1 is still running bound to `0.0.0.0:8000`.
+4. Verify the Windows Firewall rule (`Aegis3D FastAPI LAN`) is active.
+5. On **Laptop 2**, verify network connectivity to the new IP:
+   ```powershell
+   Test-NetConnection <NEW_LAPTOP1_IP> -Port 8000
+   ```
+6. On **Laptop 2**, verify HTTP backend liveness:
+   ```cmd
+   curl.exe http://<NEW_LAPTOP1_IP>:8000/health
+   ```
+7. Update **Laptop 2's** `BACKEND_URL`:
+   - If using CLI flag: Pass `--backend-url http://<NEW_LAPTOP1_IP>:8000`.
+   - If using `.env`: Update `BACKEND_URL=http://<NEW_LAPTOP1_IP>:8000` in `simulator/.env`.
+8. Restart the simulator process on Laptop 2 if necessary.
+9. Execute a normal test packet:
+   `python main.py --mode normal --sensor PZT-Z01 --batches 1`
+10. Confirm Laptop 1's dashboard receives and displays the telemetry.
+
+> [!NOTE]
+> You **normally do NOT need to modify backend or frontend source code** merely because Laptop 1 received a different LAN IP address.
+
+---
+
+### 16. Complete Startup Order
+
+For reliable live presentations, execute commands in this exact canonical sequence:
 
 ```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                        LAPTOP 1 (Platform Host)                        │
-├────────────────────────────────────────────────────────────────────────┤
-│ 1. Start PostgreSQL     ──► docker compose up -d postgres             │
-│ 2. Start FastAPI        ──► uvicorn app.main:app --host 0.0.0.0 --port 8000 │
-│ 3. Verify Health        ──► curl http://localhost:8000/health         │
-│ 4. Start Next.js        ──► npm run dev                               │
-│ 5. Open Dashboard       ──► http://localhost:3000/dashboard           │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │ Ensure Laptop 1 is fully ready
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                       LAPTOP 2 (Simulator Host)                        │
-├────────────────────────────────────────────────────────────────────────┤
-│ 6. Verify Laptop 1 IP   ──► Test-NetConnection <LAPTOP_1_IP> -Port 8000 │
-│ 7. Test Ingestion       ──► python main.py --mode normal --batches 1   │
-│ 8. Inject Anomaly       ──► python main.py --mode anomaly --batches 1  │
-│ 9. Run Correlation      ──► python main.py --mode correlation --batches 1│
-└────────────────────────────────────────────────────────────────────────┘
+================================================================================
+LAPTOP 1 (Platform Host)
+================================================================================
+1. Connect to Network          --> Verify Wi-Fi / Ethernet / Hotspot connection
+2. Identify LAN IPv4           --> ipconfig (e.g. 192.168.1.39)
+3. Start PostgreSQL            --> docker compose up -d postgres
+4. Start FastAPI Backend       --> cd backend; uvicorn app.main:app --host 0.0.0.0 --port 8000
+5. Verify Local Health         --> curl.exe http://127.0.0.1:8000/health
+6. Verify Firewall Rule        --> Get-NetFirewallRule -DisplayName "Aegis3D FastAPI LAN"
+7. Start Next.js Dashboard     --> cd frontend; npm run dev
+8. Verify Dashboard Browser    --> http://localhost:3000/dashboard
+
+================================================================================
+LAPTOP 2 (Simulator Host)
+================================================================================
+1. Connect to Same Network     --> Join exact same Wi-Fi / LAN as Laptop 1
+2. Check Network Layer Ping    --> ping <LAPTOP1_IP>
+3. Check TCP Port 8000         --> Test-NetConnection <LAPTOP1_IP> -Port 8000
+4. Check HTTP Health           --> curl.exe http://<LAPTOP1_IP>:8000/health
+5. Configure Target URL        --> set BACKEND_URL=http://<LAPTOP1_IP>:8000
+6. Start Simulator             --> cd simulator; .\.venv\Scripts\activate
+7. Run Healthy Baseline Test   --> python main.py --mode normal --sensor PZT-Z01 --batches 1
+8. Run Anomaly Test            --> python main.py --mode anomaly --sensor PZT-Z05 --batches 1
+9. Verify Processing Inspector --> Observe 9-stage progression & Page 1 reset on Laptop 1
+10. Verify 3D Digital Twin     --> Inspect zone highlighting on Laptop 1 dashboard
 ```
 
 ---
 
-### 📡 Verify Live Telemetry Flow
+### 17. Troubleshooting
 
-When **Laptop 2** transmits a telemetry packet, verify the complete end-to-end execution flow:
-
-```text
-Laptop 2 (Virtual PZT Simulator)
-  │
-  ├── 1. HTTP POST /api/v1/telemetry JSON Packet
-  │
-  ▼
-Laptop 1 (FastAPI Backend)
-  │
-  ├── 2. Ingestion & DC Offset Subtraction
-  ├── 3. 4th-Order Butterworth Lowpass Signal Filtering
-  ├── 4. Activity Window Event Detection
-  ├── 5. Spectral Feature Extraction (Peak, RMS, Energy, FFT Frequency)
-  ├── 6. Zone Baseline Comparison & Standardized Z-Score (|z| ≥ 3.0)
-  ├── 7. Temporal Persistence Evaluation (Rolling Anomaly Ratio)
-  ├── 8. 2-PZT Cross-Sensor TDOA Arrival Order Correlation
-  ├── 9. Structural Health Indicator (SHI 0–100) Recalculation & Alert Evaluation
-  │
-  ├── 10. LiveEventBus Emits Real-Time Stage Events to SSE Stream
-  │
-  ▼
-Laptop 1 (Next.js Dashboard & 3D Digital Twin)
-  │
-  ├── Telemetry Operations HUD updates status & discrete signal waveform trace
-  ├── Processing Inspector opens with sequential 9-stage progression
-  └── 3D Digital Twin elements update zone health highlight colors (Green/Amber/Red)
-```
-
-#### What to Check During Demo Verification
-- **Laptop 2 Terminal**: Output displays `[SUCCESS] Telemetry accepted by backend (Status: 200 OK)`.
-- **Laptop 1 Backend Logs**: Logs record `POST /api/v1/telemetry 200 OK` processed in sub-15 ms.
-- **Laptop 1 Dashboard**: Telemetry HUD updates instantly; Processing Inspector steps through stages 1 → 9 with visual dwell pacing and automatically resets to Page 1 (Ingestion) upon completion.
+| Failure Layer | Observed Symptom | Underlying Root Cause | Exact Diagnostic & Recovery Action |
+| :--- | :--- | :--- | :--- |
+| **A. Physical LAN / Ping** | Laptop 2 `ping <LAPTOP1_IP>` fails (`Destination host unreachable` / `Request timed out`). | Laptops are on different network subnets, Wi-Fi AP isolation is active, or ICMP is blocked. | 1. Run `ipconfig` on both laptops to verify matching subnet prefixes.<br>2. Note that ping failure does **not** prove TCP is broken (ICMP may be blocked).<br>3. Proceed directly to `Test-NetConnection` to test TCP port 8000.<br>4. If network isolation persists, switch to **Mobile Hotspot** fallback. |
+| **B. Firewall / Binding** | `Test-NetConnection <LAPTOP1_IP> -Port 8000` returns `TcpTestSucceeded : False`. | FastAPI Uvicorn bound strictly to `127.0.0.1`, Windows Firewall blocking port 8000, or network profile is `Public`. | 1. On Laptop 1, verify Uvicorn binding: `netstat -ano \| findstr :8000` (must show `0.0.0.0:8000 LISTENING`).<br>2. On Laptop 1 (Admin), re-add firewall rule: `New-NetFirewallRule -DisplayName "Aegis3D FastAPI LAN" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow -Profile Private`.<br>3. Check network profile: `Get-NetConnectionProfile`; set to `Private` if permitted. |
+| **C. Routing / LAN IP** | `/health` works locally on Laptop 1 (`127.0.0.1:8000`), but fails from Laptop 2. | Firewall blocking inbound LAN traffic, or wrong IPv4 address entered on Laptop 2. | 1. Re-verify Laptop 1 IPv4 using `ipconfig`.<br>2. Confirm Laptop 1 firewall rule `Aegis3D FastAPI LAN` is enabled.<br>3. Test `curl.exe http://<LAPTOP1_IP>:8000/health` directly on Laptop 1's LAN IP interface. |
+| **D. Simulator Config** | Simulator reports `API Disconnected` or `ECONNREFUSED`. | `BACKEND_URL` on Laptop 2 set to `localhost`/`127.0.0.1`, FastAPI not running, or wrong port. | 1. Ensure `BACKEND_URL` points to Laptop 1's LAN IP (e.g., `http://192.168.1.39:8000`).<br>2. Verify FastAPI Uvicorn process is running on Laptop 1.<br>3. Do **not** use `localhost` on Laptop 2. |
+| **E. Telemetry Rejected** | Simulator sends telemetry but backend returns `HTTP 400 Bad Request`. | Telemetry packet contains invalid sensor/zone pair or unassigned sensor (`PZT-Z09`–`PZT-Z12`). | 1. Use canonical assigned sensors: `PZT-Z01`–`PZT-Z04` for Zone 2, or `PZT-Z05`–`PZT-Z08` for Zone 1.<br>2. Inspect Uvicorn tracebacks on Laptop 1.<br>3. Do not modify simulator DSP code. |
+| **F. Real-Time SSE Stream** | Processing Inspector displays `SSE: DISCONNECTED` or `Connecting...`. | SSE endpoint `/api/v1/telemetry/live` blocked by network proxy or backend event bus error. | 1. Test `curl.exe http://<LAPTOP1_IP>:8000/api/v1/telemetry/live` in terminal.<br>2. Verify FastAPI backend process is active.<br>3. Note: HTTP telemetry ingestion can still succeed even if live SSE UI visualization disconnects. |
+| **G. Frontend Stale State** | Simulator sends telemetry successfully, but Dashboard HUD does not update. | Dashboard connected to wrong backend IP, or browser state stale. | 1. Verify `NEXT_PUBLIC_API_BASE_URL` in `frontend/.env.local` points to correct FastAPI host.<br>2. Hard-refresh browser (`Ctrl + F5`).<br>3. Verify backend emitted `POST /api/v1/telemetry 200 OK`. |
+| **H. 3D Twin Highlight** | Telemetry processed with anomaly, but 3D Digital Twin element does not highlight. | Active alert not generated, or BIM zone mapping unassigned. | 1. Check if $|z| \ge 3.0$ threshold was exceeded.<br>2. Verify active alert appears in System Alerts panel.<br>3. Note that Digital Twin highlights structural zones, not exact 3D crack points. |
+| **I. Next.js Chunk Error** | `Error: Cannot find module './682.js'` from `webpack-runtime.js`. | `npm run build` was executed while `npm run dev` was actively running, corrupting `.next` artifacts. | **Safe Recovery**: <br>1. Stop Next.js dev server on Laptop 1.<br>2. Delete build directory: `Remove-Item -Recurse -Force frontend/.next`.<br>3. Restart dev server: `cd frontend; npm run dev`. *(Do NOT delete `node_modules` or source files)*. |
+| **J. Unstyled Frontend** | Dashboard renders completely unstyled plain HTML, with `API: DISCONNECTED`. | Next.js development build cache corrupted or CSS compilation failed. | 1. Stop Next.js dev server.<br>2. Delete `frontend/.next`.<br>3. Restart `npm run dev`.<br>4. Do not rewrite UI code. |
+| **K. Hackathon Network** | Setup worked on Home Wi-Fi but fails at Hackathon venue network. | Venue Wi-Fi enforces Client AP Isolation or assigned new IP addresses. | 1. Re-run `ipconfig` on Laptop 1 to obtain new venue IP.<br>2. Test `Test-NetConnection <NEW_IP> -Port 8000`.<br>3. If AP isolation blocks traffic, switch to **Mobile Hotspot** fallback. |
+| **L. Hotspot Fallback** | Venue Wi-Fi completely blocks laptop-to-laptop traffic. | Network router enforces AP Isolation. | 1. Turn on Mobile Hotspot on Laptop 1 (or smartphone).<br>2. Connect Laptop 2 to Hotspot Wi-Fi.<br>3. Obtain Laptop 1 Hotspot adapter IP via `ipconfig`.<br>4. Update `BACKEND_URL` on Laptop 2. |
 
 ---
 
-### 🔄 If the Network / IP Address Changes
+### 18. Quick Hackathon Checklist
 
-If you move Laptop 1 and Laptop 2 to a new Wi-Fi network or switch to a mobile hotspot:
+Print or scan this quick checklist at the venue before demonstration:
 
-1. **Find Laptop 1's New IP**: Run `ipconfig` on Laptop 1 to get the new IPv4 address (e.g. `192.168.43.115`).
-2. **Update Laptop 2 Target**:
-   - If using CLI flag: Pass `--backend-url http://192.168.43.115:8000` on your next command.
-   - If using `.env`: Edit `simulator/.env` and update `BACKEND_URL=http://192.168.43.115:8000`.
-3. **Re-Run Simulator Command**: Re-run your `python main.py` command on Laptop 2.
-
-> **Note**: No code compilation, backend rebuild, frontend restart, or database migration is required.
-
----
-
-### 🛠️ Hackathon Troubleshooting Guide
-
-| Problem | Likely Cause | Exact Diagnostic & Recovery Action |
-| :--- | :--- | :--- |
-| **`Destination host unreachable` / Ping Fails** | Laptops cannot communicate at the physical/LAN network layer (different subnets or AP isolation). | 1. Run `ipconfig` on both laptops; ensure both share the same subnet prefix.<br>2. Run reverse ping from Laptop 1 (`ping <LAPTOP_2_IP>`).<br>3. Check for Wi-Fi AP isolation or switch to Mobile Hotspot backup. |
-| **`TcpTestSucceeded : False` (Ping succeeds, Port 8000 fails)** | FastAPI not listening on `0.0.0.0`, or Windows Firewall blocking port 8000. | 1. On Laptop 1, run `netstat -ano \| findstr :8000`; verify `0.0.0.0:8000 LISTENING`.<br>2. On Laptop 1 (Admin), run `New-NetFirewallRule -DisplayName "Aegis3D FastAPI LAN" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow -Profile Private`. |
-| **Laptop 2 opens `/docs` in browser but `python main.py` fails** | Simulator `BACKEND_URL` configuration or environment file issue. | 1. Check `simulator/.env` or pass `--backend-url http://<LAPTOP_1_IP>:8000` explicitly on CLI.<br>2. Ensure `BACKEND_URL` does **not** include `/api/v1/telemetry`. |
-| **`Connection refused` on Laptop 2** | FastAPI backend is not running on Laptop 1 or port 8000 is wrong. | 1. Verify Uvicorn process on Laptop 1.<br>2. Check `curl http://localhost:8000/health` on Laptop 1. |
-| **`Cannot change NetworkCategory` in PowerShell** | PowerShell lacking Administrator elevation or restricted by Group Policy. | 1. Launch PowerShell as Administrator.<br>2. If policy prevents changes, check if venue Wi-Fi AP isolation is active and switch to Mobile Hotspot. |
-| **Both laptops connected to Wi-Fi but cannot ping each other** | Venue Wi-Fi router enforces Client AP Isolation / Guest Isolation. | Enable Mobile Hotspot on Laptop 1, connect Laptop 2 to Laptop 1's hotspot, update `<LAPTOP_1_IP>`, and re-test `ping`. |
-| **Simulator reports `HTTP 400 Bad Request: Sensor '...' is inconsistent with target zone`** | Simulator packet specifies an invalid sensor/zone pair or targets an unassigned sensor (`PZT-Z09`–`PZT-Z12`). | Use canonical assigned sensors: `PZT-Z01`–`PZT-Z04` for Zone 2 (`Zone 2 - Substructure Pier B`) or `PZT-Z05`–`PZT-Z08` for Zone 1 (`Zone 1 - Main Deck Girder`). |
-| **Dashboard loads on Laptop 1 but receives no live telemetry stream** | 1. Simulator transmitting to wrong IP.<br>2. FastAPI backend not running. | 1. Verify `BACKEND_URL` on Laptop 2.<br>2. Check `http://localhost:8000/health` on Laptop 1. |
-| **Next.js Error: `Cannot find module './682.js'`** | `npm run build` was executed while `npm run dev` was actively running, corrupting Next.js `.next` development server chunks. | **Safe Recovery Procedure**: <br>1. Stop Next.js dev server on Laptop 1.<br>2. Ensure port 3000 is released.<br>3. Delete build directory: `Remove-Item -Recurse -Force frontend/.next`<br>4. Restart dev server: `cd frontend; npm run dev`. *(Do NOT delete `node_modules`)*. |
+- [ ] **Network**: Laptop 1 and Laptop 2 connected to the same Wi-Fi, Ethernet, or Hotspot network.
+- [ ] **Laptop 1 IP**: Active IPv4 address identified via `ipconfig` on Laptop 1.
+- [ ] **PostgreSQL**: PostgreSQL container running on Laptop 1 (`docker compose up -d postgres`).
+- [ ] **FastAPI Backend**: FastAPI running on Laptop 1 bound to `0.0.0.0:8000`.
+- [ ] **FastAPI Liveness**: `http://127.0.0.1:8000/health` returns `200 OK` on Laptop 1.
+- [ ] **Windows Firewall**: Inbound TCP rule `Aegis3D FastAPI LAN` active for port 8000 on Laptop 1.
+- [ ] **Laptop 2 TCP Test**: `Test-NetConnection <LAPTOP1_IP> -Port 8000` returns `TcpTestSucceeded : True` on Laptop 2.
+- [ ] **Laptop 2 HTTP Test**: `curl.exe http://<LAPTOP1_IP>:8000/health` returns `200 OK` on Laptop 2.
+- [ ] **Simulator Config**: `BACKEND_URL` on Laptop 2 points to `http://<LAPTOP1_IP>:8000` (no trailing path).
+- [ ] **Next.js Dashboard**: Next.js running on Laptop 1 (`npm run dev`) and accessible at `http://localhost:3000/dashboard`.
+- [ ] **Build Safety**: No `npm run build` running concurrently with `npm run dev`.
+- [ ] **Healthy Test**: `python main.py --mode normal --sensor PZT-Z01 --batches 1` succeeds from Laptop 2.
+- [ ] **Anomaly Test**: `python main.py --mode anomaly --sensor PZT-Z05 --batches 1` succeeds from Laptop 2.
+- [ ] **Processing Inspector**: Stage progression 1 $\rightarrow$ 9 and automatic Page 1 reset verified on Laptop 1.
+- [ ] **3D Digital Twin**: Zone 1 highlight and active alert banner verified on Laptop 1 dashboard.
+- [ ] **IP Change Procedure**: Procedure understood for updating `BACKEND_URL` if venue IP changes.
 
 ---
 
-### 🛟 Venue Network Backup (Mobile Hotspot)
 
-If the venue Wi-Fi blocks peer-to-peer communication via Client AP Isolation:
-
-```text
-┌────────────────────────────────────────────────────────┐
-│ 1. Enable Mobile Hotspot on Laptop 1                   │
-│ 2. Connect Laptop 2 to Laptop 1's Hotspot Wi-Fi        │
-│ 3. Run ipconfig on Laptop 1 (Find Hotspot Adapter IP)  │
-│ 4. Set BACKEND_URL=http://<HOTSPOT_IP>:8000 on Laptop 2│
-│ 5. Test http://<HOTSPOT_IP>:8000/docs from Laptop 2    │
-│ 6. Launch Simulator on Laptop 2                        │
-└────────────────────────────────────────────────────────┘
-```
-
----
-
-### ✅ Final Hackathon Checklist
-
-#### Network Verification
-- [ ] Laptop 1 and Laptop 2 connected to the same Wi-Fi, Ethernet, or Hotspot
-- [ ] Active IPv4 address of Laptop 1 identified via `ipconfig`
-- [ ] Both laptops can ping each other (`ping <LAPTOP_1_IP>`)
-- [ ] Laptop 1 FastAPI actively listening on `0.0.0.0:8000` (`netstat -ano | findstr :8000`)
-- [ ] Windows Firewall TCP Port 8000 allowed on Laptop 1 (`Aegis3D FastAPI LAN`)
-- [ ] Laptop 2 verifies connectivity via `http://<LAPTOP_1_IP>:8000/docs` & `/health`
-
-#### Laptop 1 (Platform Host)
-- [ ] PostgreSQL container running (`docker compose up -d postgres`)
-- [ ] FastAPI backend running bound to `0.0.0.0:8000`
-- [ ] Backend health endpoint returns 200 OK (`http://localhost:8000/health`)
-- [ ] Next.js frontend running (`npm run dev`)
-- [ ] Dashboard accessible at `http://localhost:3000/dashboard`
-- [ ] 3D Digital Twin viewer and City Map rendered clean without errors
-
-#### Laptop 2 (Simulator Host)
-- [ ] Python virtual environment configured (`simulator/.venv`)
-- [ ] `BACKEND_URL` configured to `http://<LAPTOP_1_IP>:8000`
-- [ ] Canonical sensor selection verified (`PZT-Z01` or `PZT-Z05`)
-- [ ] Test packet transmission returns HTTP 200 OK
-
-#### Live Demonstration Flow
-- [ ] Simulator telemetry packet transmitted from Laptop 2
-- [ ] Backend processes packet in ~10 ms and emits real SSE events
-- [ ] Telemetry HUD displays live telemetry waveform and sequence counter
-- [ ] Processing Inspector panel opens with 9-stage progression
-- [ ] 3D Digital Twin highlights affected structural zone in real time
-
----
 
 ## Local Single-Machine Setup
 
