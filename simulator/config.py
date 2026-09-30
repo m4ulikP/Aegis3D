@@ -47,7 +47,7 @@ def load_env_file(filepath: str = ".env") -> None:
 class SimulatorConfig:
     """Runtime configuration for virtual sensor telemetry transmission."""
 
-    backend_url: str = "http://localhost:8000"
+    backend_url: str = "http://127.0.0.1:8000"
     telemetry_endpoint: str = "/api/v1/telemetry"
     timeout_seconds: float = 5.0
     default_sample_rate_hz: float = 1000.0

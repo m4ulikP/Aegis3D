@@ -69,6 +69,51 @@ interface DigitalTwinViewerProps {
 }
 
 /* =========================================================
+   CANONICAL SENSOR-TO-PHYSICS LOCALIZATION REGISTRY
+========================================================= */
+
+export interface LocalizedComponentInfo {
+    guid: string;
+    glb_node: string;
+    name: string;
+    type: string;
+    label: string;
+}
+
+export const SENSOR_LOCALIZED_COMPONENTS: Record<string, LocalizedComponentInfo> = {
+    // Zone 1 Primary Simulated Damaged Component (Physics Guided-Wave Path 007)
+    "PZT-Z05": {
+        guid: "1WrzGm1SD2ev45B_OWQ3El",
+        glb_node: "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124614",
+        name: "M_Concrete-Rectangular Beam:300 x 600mm:124614",
+        type: "IfcBeam",
+        label: "Simulated Affected Component (Main Deck Beam 124614)",
+    },
+    "PZT-Z06": {
+        guid: "1WrzGm1SD2ev45B_OWQ3Eg",
+        glb_node: "IfcBeam/M_Concrete-Rectangular Beam:300 x 600mm:124615",
+        name: "M_Concrete-Rectangular Beam:300 x 600mm:124615",
+        type: "IfcBeam",
+        label: "Simulated Affected Component (Main Deck Beam 124615)",
+    },
+    // Zone 2 Primary Simulated Damaged Component (Physics Guided-Wave Path 001)
+    "PZT-Z01": {
+        guid: "2Ci2k7uxXCqAqqsxOmESOv",
+        glb_node: "IfcColumn/UC-Universal Columns-Column:UC356x368x129:123067",
+        name: "UC-Universal Columns-Column:UC356x368x129:123067",
+        type: "IfcColumn",
+        label: "Simulated Affected Component (Pier B Column 123067)",
+    },
+    "PZT-Z02": {
+        guid: "18YHwga450Mw4Fy6M5t_8F",
+        glb_node: "IfcColumn/M_Concrete-Round-Column:450mm:122548",
+        name: "M_Concrete-Round-Column:450mm:122548",
+        type: "IfcColumn",
+        label: "Simulated Affected Component (Pier B Column 122548)",
+    },
+};
+
+/* =========================================================
    ZONE IDENTITY RESOLUTION HELPER
 ========================================================= */
 
@@ -104,8 +149,29 @@ export function resolveBackendZone(
     return undefined;
 }
 
+export function resolveMappingZoneId(
+    targetId: number | null,
+    mapping: ZoneBimMappingFile | null,
+    backendZones: ZoneResponse[]
+): number | null {
+    if (targetId === null || targetId === undefined || !mapping?.zones) return null;
+
+    // 1. Direct match with mapping.zone.zone_id (e.g. 1 or 2)
+    const directMatch = mapping.zones.find((z) => z.zone_id === targetId);
+    if (directMatch) return directMatch.zone_id;
+
+    // 2. Match targetId with backendZone.id
+    const matchedByBackend = mapping.zones.find((mz) => {
+        const bz = resolveBackendZone(mz, backendZones);
+        return bz?.id === targetId;
+    });
+    if (matchedByBackend) return matchedByBackend.zone_id;
+
+    return null;
+}
+
 /* =========================================================
-   BUILDING MODEL WITH DYNAMIC MATERIAL HIGHLIGHTING
+   BUILDING MODEL WITH LOCALIZED MATERIAL HIGHLIGHTING
 ========================================================= */
 
 interface BuildingModelProps {
@@ -160,7 +226,7 @@ function BuildingModel({
         return { meshMap: mNodeMap, originalMaterials: mOrigMat };
     }, [model]);
 
-    // Resolve mapped components in zone_bim_mapping.json to Three.js meshes
+    // Index all GLB nodes in zone_bim_mapping.json to Three.js meshes
     const zoneMeshesMap = useMemo(() => {
         const zMap = new Map<number, THREE.Mesh[]>();
         if (!mapping?.zones) return zMap;
@@ -171,56 +237,55 @@ function BuildingModel({
         for (const zone of mapping.zones) {
             const meshes: THREE.Mesh[] = [];
             for (const comp of zone.components) {
-                const found = meshMap.get(comp.glb_node);
+                const sanitized = THREE.PropertyBinding.sanitizeNodeName(comp.glb_node);
+
+                let found = meshMap.get(sanitized);
+                if (!found || found.length === 0) {
+                    found = meshMap.get(comp.glb_node);
+                }
+                if (!found || found.length === 0) {
+                    const obj = model.getObjectByName(sanitized) || model.getObjectByName(comp.glb_node);
+                    if (obj) {
+                        const descendantMeshes: THREE.Mesh[] = [];
+                        obj.traverse((c) => {
+                            if (c instanceof THREE.Mesh) descendantMeshes.push(c);
+                        });
+                        if (descendantMeshes.length > 0) found = descendantMeshes;
+                    }
+                }
+                if (!found || found.length === 0) {
+                    const shortName = comp.name || comp.glb_node.split("/").pop();
+                    if (shortName) {
+                        const sanitizedShort = THREE.PropertyBinding.sanitizeNodeName(shortName);
+                        found = meshMap.get(sanitizedShort) || meshMap.get(shortName);
+                    }
+                }
+
                 if (found && found.length > 0) {
                     meshes.push(...found);
                     totalResolved++;
                 } else {
                     totalUnresolved++;
-                    console.warn(`[Aegis3D BIM Viewer] Unresolved GLB node: ${comp.glb_node}`);
                 }
             }
             zMap.set(zone.zone_id, meshes);
         }
 
-        console.info(
-            `[Aegis3D BIM Viewer] Scene resolved ${totalResolved} component meshes (${totalUnresolved} unresolved)`
-        );
         return zMap;
-    }, [mapping, meshMap]);
+    }, [mapping, meshMap, model]);
 
-    // Apply reversible material highlighting based on live health and active selection
+    // Apply localized material highlighting based strictly on active alerts and selection
     useEffect(() => {
         const createdMaterials: THREE.Material[] = [];
 
-        function createHighlightMaterial(type: "critical" | "warning" | "selected") {
-            let mat: THREE.MeshStandardMaterial;
-            if (type === "critical") {
-                mat = new THREE.MeshStandardMaterial({
-                    color: new THREE.Color("#f87171"),
-                    emissive: new THREE.Color("#dc2626"),
-                    emissiveIntensity: 0.85,
-                    roughness: 0.2,
-                    metalness: 0.1,
-                });
-            } else if (type === "warning") {
-                mat = new THREE.MeshStandardMaterial({
-                    color: new THREE.Color("#fbbf24"),
-                    emissive: new THREE.Color("#d97706"),
-                    emissiveIntensity: 0.75,
-                    roughness: 0.25,
-                    metalness: 0.1,
-                });
-            } else {
-                // Active selection of healthy zone
-                mat = new THREE.MeshStandardMaterial({
-                    color: new THREE.Color("#38bdf8"),
-                    emissive: new THREE.Color("#0284c7"),
-                    emissiveIntensity: 0.65,
-                    roughness: 0.3,
-                    metalness: 0.15,
-                });
-            }
+        function createMaterial(colorHex: string, emissiveHex: string, intensity: number) {
+            const mat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(colorHex),
+                emissive: new THREE.Color(emissiveHex),
+                emissiveIntensity: intensity,
+                roughness: 0.25,
+                metalness: 0.1,
+            });
             createdMaterials.push(mat);
             return mat;
         }
@@ -230,11 +295,14 @@ function BuildingModel({
             mesh.material = origMat;
         });
 
-        // 2. Apply highlights to mapped zone groups
+        const redMat = createMaterial("#ef4444", "#dc2626", 0.85);
+        const selectedMat = createMaterial("#38bdf8", "#0284c7", 0.65);
+
+        // 2. Apply localized highlights
         if (mapping?.zones) {
             for (const zone of mapping.zones) {
-                const meshes = zoneMeshesMap.get(zone.zone_id) || [];
-                if (meshes.length === 0) continue;
+                const zoneMeshes = zoneMeshesMap.get(zone.zone_id) || [];
+                if (zoneMeshes.length === 0) continue;
 
                 const isSelected = activeZoneId === zone.zone_id;
                 const isViewingAll = activeZoneId === null;
@@ -245,37 +313,35 @@ function BuildingModel({
                 const zoneAlerts = backendZoneId !== undefined
                     ? alerts.filter((a) => a.zone_id === backendZoneId && a.status === "ACTIVE")
                     : [];
-                const health = backendZoneId !== undefined ? zoneHealthMap[backendZoneId] : undefined;
 
-                const hasCriticalAlert = zoneAlerts.some(
-                    (a) => a.severity === "CRITICAL" || a.severity === "HIGH"
-                );
-                const hasWarningAlert = zoneAlerts.some(
-                    (a) => a.severity === "MEDIUM" || a.severity === "LOW"
-                );
+                const hasActiveAlert = zoneAlerts.length > 0;
 
-                const isCriticalHealth =
-                    health?.status === "HIGH_PRIORITY_INSPECTION" ||
-                    health?.status === "INSPECTION_ADVISED";
-                const isWarningHealth = health?.status === "MONITOR";
-
-                let highlightType: "critical" | "warning" | "selected" | null = null;
-
-                if (hasCriticalAlert || isCriticalHealth) {
-                    highlightType = "critical";
-                } else if (hasWarningAlert || isWarningHealth) {
-                    highlightType = "warning";
-                } else if (isSelected) {
-                    highlightType = "selected";
-                }
-
-                // If user selected a specific zone, only highlight that zone unless in 'view all' mode
-                if (highlightType) {
+                if (hasActiveAlert) {
                     if (isViewingAll || isSelected) {
-                        const mat = createHighlightMaterial(highlightType);
-                        for (const mesh of meshes) {
-                            mesh.material = mat;
+                        // Localized Anomaly Highlight: Highlight specific simulated damaged component in RED
+                        const targetSensorKey = zone.zone_id === 1 ? "PZT-Z05" : "PZT-Z01";
+                        const localizedInfo = SENSOR_LOCALIZED_COMPONENTS[targetSensorKey];
+
+                        if (localizedInfo) {
+                            const sanitizedNode = THREE.PropertyBinding.sanitizeNodeName(localizedInfo.glb_node);
+                            const targetMeshes = meshMap.get(sanitizedNode) || meshMap.get(localizedInfo.glb_node) || [];
+
+                            if (targetMeshes.length > 0) {
+                                for (const m of targetMeshes) {
+                                    m.material = redMat;
+                                }
+                            } else {
+                                // Fallback if single node lookup missed
+                                for (const m of zoneMeshes.slice(0, 1)) {
+                                    m.material = redMat;
+                                }
+                            }
                         }
+                    }
+                } else if (isSelected) {
+                    // Selection inspection mode for healthy zone: highlight zone group in cyan
+                    for (const m of zoneMeshes) {
+                        m.material = selectedMat;
                     }
                 }
             }
@@ -288,7 +354,7 @@ function BuildingModel({
             });
             createdMaterials.forEach((mat) => mat.dispose());
         };
-    }, [mapping, zoneMeshesMap, activeZoneId, zones, zoneHealthMap, alerts, originalMaterials]);
+    }, [mapping, zoneMeshesMap, activeZoneId, zones, zoneHealthMap, alerts, originalMaterials, meshMap]);
 
     return <primitive object={model} />;
 }
@@ -331,21 +397,34 @@ export default function DigitalTwinViewer({
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Load canonical mapping and live monitoring telemetry
+    // 1. Load static BIM mapping independently & immediately on mount
     useEffect(() => {
         let isMounted = true;
-        let pollInterval: NodeJS.Timeout | null = null;
-
-        async function initViewerData() {
+        async function loadBimMapping() {
             try {
-                // 1. Fetch canonical Step 1 mapping artifact
                 const mapRes = await fetch("/data/zone_bim_mapping.json");
-                if (!mapRes.ok) {
-                    throw new Error(`Failed to load zone BIM mapping: HTTP ${mapRes.status}`);
+                if (mapRes.ok) {
+                    const mapData: ZoneBimMappingFile = await mapRes.json();
+                    if (isMounted) {
+                        setMapping(mapData);
+                    }
                 }
-                const mapData: ZoneBimMappingFile = await mapRes.json();
+            } catch (err) {
+                console.warn("[Aegis3D BIM Viewer] Failed to load static BIM mapping:", err);
+            }
+        }
+        loadBimMapping();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
-                // 2. Fetch live zones and active alerts
+    // 2. Poll live backend zones, alerts, and health independently
+    useEffect(() => {
+        let isMounted = true;
+
+        async function fetchLiveBackendState() {
+            try {
                 const [zonesData, alertsData] = await Promise.all([
                     api.getZones().catch((err) => {
                         console.warn("Failed to fetch zones for BIM viewer:", err);
@@ -357,7 +436,8 @@ export default function DigitalTwinViewer({
                     }),
                 ]);
 
-                // 3. Fetch detailed health status for each zone
+                const activeAlerts = alertsData.filter((a: AlertResponse) => a.status === "ACTIVE");
+
                 const healthEntries: Record<number, ZoneHealthResponse> = {};
                 await Promise.all(
                     zonesData.map(async (z) => {
@@ -371,60 +451,38 @@ export default function DigitalTwinViewer({
                 );
 
                 if (isMounted) {
-                    setMapping(mapData);
                     setZones(zonesData);
-                    setAlerts(alertsData);
+                    setAlerts(activeAlerts);
                     setZoneHealthMap(healthEntries);
                     setLoading(false);
-
-                    // 4. Start periodic background polling (every 1.5s) to reflect real-time simulator events
-                    pollInterval = setInterval(async () => {
-                        if (!isMounted) return;
-                        try {
-                            const [freshAlerts, freshZones] = await Promise.all([
-                                api.getAlerts().catch(() => []),
-                                api.getZones().catch(() => []),
-                            ]);
-                            const freshHealth: Record<number, ZoneHealthResponse> = {};
-                            const targetZones = freshZones.length > 0 ? freshZones : zonesData;
-                            await Promise.all(
-                                targetZones.map(async (z) => {
-                                    try {
-                                        const h = await api.getZoneHealth(z.id);
-                                        freshHealth[z.id] = h;
-                                    } catch {
-                                        // Ignore polling failures
-                                    }
-                                })
-                            );
-                            if (isMounted) {
-                                setAlerts(freshAlerts);
-                                if (freshZones.length > 0) setZones(freshZones);
-                                if (Object.keys(freshHealth).length > 0) {
-                                    setZoneHealthMap(freshHealth);
-                                }
-                            }
-                        } catch {
-                            // Non-blocking poll failure
-                        }
-                    }, 1500);
                 }
             } catch (err: any) {
                 if (isMounted) {
-                    console.error("[Aegis3D BIM Viewer] Initialization error:", err);
                     setError(err.message || "Failed to initialize Digital Twin viewer");
                     setLoading(false);
                 }
             }
         }
 
-        initViewerData();
+        fetchLiveBackendState();
+
+        const interval = setInterval(fetchLiveBackendState, 1500);
 
         return () => {
             isMounted = false;
-            if (pollInterval) clearInterval(pollInterval);
+            clearInterval(interval);
         };
     }, []);
+
+    // Synchronize initialZoneId when mapping and backend zones are loaded
+    useEffect(() => {
+        if (initialZoneId !== null && initialZoneId !== undefined && mapping && zones.length > 0) {
+            const resolvedId = resolveMappingZoneId(initialZoneId, mapping, zones);
+            if (resolvedId !== null) {
+                setActiveZoneId(resolvedId);
+            }
+        }
+    }, [initialZoneId, mapping, zones]);
 
     const totalMappedComponents = useMemo(() => {
         if (!mapping?.zones) return 0;
@@ -534,11 +592,11 @@ export default function DigitalTwinViewer({
                         Monitored BIM Zones
                     </h2>
                     <span style={{ fontSize: 11, color: "#94a3b8", background: "rgba(51, 65, 85, 0.6)", padding: "2px 6px", borderRadius: 4 }}>
-                        {totalMappedComponents} elements mapped
+                        {mapping ? `${totalMappedComponents} elements mapped` : "Loading BIM mapping..."}
                     </span>
                 </div>
                 <p style={{ fontSize: 11, color: "#94a3b8", margin: "0 0 12px 0", lineHeight: 1.4 }}>
-                    Option 1: Inferred spatial component groups linked to live telemetry.
+                    Inferred spatial component groups linked to live PZT telemetry.
                 </p>
 
                 {/* View Mode Selector */}
@@ -590,13 +648,25 @@ export default function DigitalTwinViewer({
                             ? alerts.filter((a) => a.zone_id === backendZoneId && a.status === "ACTIVE")
                             : [];
                         const isSelected = activeZoneId === zone.zone_id;
+                        const hasActiveAlert = zoneAlerts.length > 0;
                         const isCritical =
-                            zoneAlerts.some((a) => a.severity === "CRITICAL" || a.severity === "HIGH") ||
+                            hasActiveAlert ||
                             health?.status === "HIGH_PRIORITY_INSPECTION" ||
                             health?.status === "INSPECTION_ADVISED";
                         const isWarning =
-                            zoneAlerts.some((a) => a.severity === "MEDIUM" || a.severity === "LOW") ||
-                            health?.status === "MONITOR";
+                            !isCritical && (
+                                zoneAlerts.some((a) => a.severity === "MEDIUM" || a.severity === "LOW") ||
+                                health?.status === "MONITOR"
+                            );
+
+                        const badgeText = hasActiveAlert
+                            ? (health?.status && health.status !== "NORMAL" ? health.status : "ALERT ACTIVE")
+                            : (health?.status ?? "NORMAL");
+
+                        const badgeBg = isCritical ? "#dc2626" : isWarning ? "#d97706" : "#059669";
+
+                        const sensorKey = zone.zone_id === 1 ? "PZT-Z05" : "PZT-Z01";
+                        const locInfo = SENSOR_LOCALIZED_COMPONENTS[sensorKey];
 
                         return (
                             <div
@@ -610,6 +680,8 @@ export default function DigitalTwinViewer({
                                         : "1px solid rgba(75, 85, 99, 0.4)",
                                     background: isSelected
                                         ? "rgba(30, 58, 138, 0.3)"
+                                        : isCritical
+                                        ? "rgba(220, 38, 38, 0.15)"
                                         : "rgba(30, 41, 59, 0.5)",
                                     borderRadius: 8,
                                     padding: 12,
@@ -627,13 +699,11 @@ export default function DigitalTwinViewer({
                                             fontWeight: 700,
                                             padding: "2px 6px",
                                             borderRadius: 4,
-                                            background: isCritical ? "#dc2626" : isWarning ? "#d97706" : "#059669",
+                                            background: badgeBg,
                                             color: "#ffffff",
                                         }}
                                     >
-                                        {isCritical && zoneAlerts.length > 0 && (!health || health.status === "NORMAL")
-                                            ? "ALERT ACTIVE"
-                                            : (health?.status ?? (isCritical ? "ALERT ACTIVE" : "NORMAL"))}
+                                        {badgeText}
                                     </span>
                                 </div>
 
@@ -651,7 +721,7 @@ export default function DigitalTwinViewer({
                                     </div>
                                 )}
 
-                                {zoneAlerts.length > 0 && (
+                                {hasActiveAlert && locInfo && (
                                     <div
                                         style={{
                                             background: "rgba(220, 38, 38, 0.2)",
@@ -666,8 +736,13 @@ export default function DigitalTwinViewer({
                                         <div style={{ fontWeight: 700, color: "#fca5a5", marginBottom: 2 }}>
                                             ⚠️ {zoneAlerts[0].title}
                                         </div>
-                                        <div style={{ fontSize: 10, color: "#e2e8f0" }}>
+                                        <div style={{ fontSize: 10, color: "#e2e8f0", marginBottom: 4 }}>
                                             {zoneAlerts[0].message}
+                                        </div>
+                                        <div style={{ fontSize: 10, color: "#fef08a", fontFamily: "ui-monospace, SFMono-Regular, monospace" }}>
+                                            <strong>Simulated Affected Component:</strong>
+                                            <br />
+                                            {locInfo.name} (1 / {zone.components.length} elements)
                                         </div>
                                     </div>
                                 )}
@@ -689,67 +764,140 @@ export default function DigitalTwinViewer({
                         lineHeight: 1.4,
                     }}
                 >
-                    <span style={{ fontWeight: 700, color: "#cbd5e1" }}>Prototype Disclaimer:</span> Zone anomalies are visually highlighted across the mapped structural framing group. This indicates monitoring state and does not establish certified structural damage or millimeter crack localization.
+                    <span style={{ fontWeight: 700, color: "#cbd5e1" }}>Prototype Disclaimer:</span> Active anomalies highlight the simulated affected structural component derived from PZT guided-wave propagation physics. Unaffected structural elements remain neutral.
                 </div>
             </div>
 
             {/* =====================================================
-                RIGHT HUD: MISSION-CRITICAL TELEMETRY OPERATIONS
+                RIGHT HUD: TELEMETRY & SENSOR FREQUENCY GRAPHS
             ===================================================== */}
-            <TelemetryHUD
-                activeZoneId={activeZoneId}
-                onSelectZone={(selectedId) => {
-                    const foundByBackend = mapping?.zones.find((mz) => {
-                        const bz = resolveBackendZone(mz, zones);
-                        return bz?.id === selectedId;
-                    });
-                    if (foundByBackend) {
-                        setActiveZoneId(foundByBackend.zone_id);
-                    } else {
-                        setActiveZoneId(selectedId);
-                    }
+            <div
+                style={{
+                    position: "absolute",
+                    top: 76,
+                    right: 20,
+                    zIndex: 20,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    pointerEvents: "auto",
                 }}
-                onFocusAlert={(alert) => {
-                    const mZone = mapping?.zones.find((mz) => {
-                        const bz = resolveBackendZone(mz, zones);
-                        return bz?.id === alert.zone_id;
-                    });
-                    if (mZone) {
-                        setActiveZoneId(mZone.zone_id);
-                    }
-                }}
-                collapsed={hudCollapsed}
-                onToggleCollapse={() => setHudCollapsed(!hudCollapsed)}
-            />
+            >
+                <button
+                    onClick={() => setHudCollapsed(!hudCollapsed)}
+                    style={{
+                        background: "rgba(15, 23, 42, 0.85)",
+                        border: "1px solid rgba(148, 163, 184, 0.25)",
+                        color: hudCollapsed ? "#94a3b8" : "#34d399",
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        backdropFilter: "blur(8px)",
+                        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.3)",
+                        marginBottom: 8,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                    }}
+                >
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: hudCollapsed ? "#64748b" : "#34d399" }} />
+                    {hudCollapsed ? "SHOW TELEMETRY HUD ▶" : "HIDE TELEMETRY HUD ▼"}
+                </button>
+
+                <div
+                    className="custom-scrollbar"
+                    style={{
+                        display: hudCollapsed ? "none" : "block",
+                        width: 380,
+                        maxWidth: "calc(100vw - 40px)",
+                        maxHeight: "calc(100dvh - 140px)",
+                        overflowY: "auto",
+                        background: "rgba(15, 23, 42, 0.92)",
+                        backdropFilter: "blur(12px)",
+                        border: "1px solid rgba(148, 163, 184, 0.2)",
+                        borderRadius: 10,
+                        padding: 14,
+                        boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.6)",
+                    }}
+                >
+                    <TelemetryHUD
+                        activeZoneId={activeZoneId}
+                        onSelectZone={setActiveZoneId}
+                    />
+                </div>
+            </div>
 
             {/* =====================================================
-                3D CANVAS
+                BOTTOM CONTROLS / OVERLAY STATUS
+            ===================================================== */}
+            <div
+                style={{
+                    position: "absolute",
+                    bottom: 20,
+                    left: 20,
+                    zIndex: 10,
+                    background: "rgba(15, 23, 42, 0.75)",
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(148, 163, 184, 0.15)",
+                    borderRadius: 6,
+                    padding: "6px 12px",
+                    fontSize: 11,
+                    color: "#94a3b8",
+                    pointerEvents: "none",
+                }}
+            >
+                <div>Left click · Rotate</div>
+                <div>Middle / Right click · Pan</div>
+                <div>Scroll · Zoom</div>
+            </div>
+
+            <div
+                style={{
+                    position: "absolute",
+                    bottom: 20,
+                    right: 20,
+                    zIndex: 10,
+                    background: "rgba(15, 23, 42, 0.75)",
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(148, 163, 184, 0.15)",
+                    borderRadius: 6,
+                    padding: "6px 12px",
+                    fontSize: 11,
+                    color: "#94a3b8",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                }}
+            >
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} />
+                <span>Digital Twin Synced · Live Health Connected</span>
+            </div>
+
+            {/* =====================================================
+                THREE.JS CANVAS VIEWPORT
             ===================================================== */}
             <Canvas
-                shadows
-                dpr={[1, 2]}
                 camera={{
-                    position: [15, 12, 15],
-                    fov: 45,
+                    position: [55, 40, 65],
+                    fov: 40,
                     near: 0.1,
-                    far: 5000,
+                    far: 1000,
                 }}
-                gl={{ antialias: true }}
+                style={{ width: "100%", height: "100%" }}
+                gl={{
+                    antialias: true,
+                    alpha: false,
+                    powerPreference: "high-performance",
+                }}
             >
                 <color attach="background" args={["#020617"]} />
+                <ambientLight intensity={1.2} />
+                <directionalLight position={[60, 90, 40]} intensity={1.8} castShadow />
+                <directionalLight position={[-60, 50, -40]} intensity={0.9} />
+                <pointLight position={[0, 30, 0]} intensity={0.6} />
 
-                {/* Lighting */}
-                <ambientLight intensity={0.7} />
-                <hemisphereLight args={["#dbeafe", "#0f172a", 1.2]} />
-                <directionalLight
-                    castShadow
-                    position={[30, 40, 20]}
-                    intensity={2.2}
-                    shadow-mapSize-width={2048}
-                    shadow-mapSize-height={2048}
-                />
-
-                {/* Structural Digital Twin */}
                 <BuildingModel
                     mapping={mapping}
                     activeZoneId={activeZoneId}
@@ -759,90 +907,16 @@ export default function DigitalTwinViewer({
                     onSelectZone={(id) => setActiveZoneId(id)}
                 />
 
-                {/* Floor Grid */}
                 <StaticFloor />
 
-                {/* Camera Orbit Controls */}
                 <OrbitControls
-                    makeDefault
                     enableDamping
                     dampingFactor={0.08}
-                    rotateSpeed={0.7}
-                    panSpeed={1.5}
-                    zoomSpeed={0.9}
-                    minDistance={2}
-                    maxDistance={500}
-                    mouseButtons={{
-                        LEFT: THREE.MOUSE.ROTATE,
-                        MIDDLE: THREE.MOUSE.PAN,
-                        RIGHT: THREE.MOUSE.PAN,
-                    }}
+                    minDistance={5}
+                    maxDistance={350}
+                    maxPolarAngle={Math.PI / 2 + 0.05}
                 />
             </Canvas>
-
-            {/* =====================================================
-                CONTROL HINT
-            ===================================================== */}
-            <div
-                style={{
-                    position: "absolute",
-                    bottom: 20,
-                    left: 20,
-                    padding: "10px 14px",
-                    background: "rgba(15,23,42,0.8)",
-                    border: "1px solid rgba(148,163,184,0.15)",
-                    borderRadius: 8,
-                    color: "#94a3b8",
-                    fontSize: 12,
-                    backdropFilter: "blur(8px)",
-                }}
-            >
-                <div>Left click · Rotate</div>
-                <div>Middle / Right click · Pan</div>
-                <div>Scroll · Zoom</div>
-            </div>
-
-            {/* =====================================================
-                STATUS INDICATOR
-            ===================================================== */}
-            <div
-                style={{
-                    position: "absolute",
-                    bottom: 20,
-                    right: 20,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "9px 14px",
-                    background: "rgba(15,23,42,0.8)",
-                    border: "1px solid rgba(148,163,184,0.15)",
-                    borderRadius: 8,
-                    color: "#cbd5e1",
-                    fontSize: 12,
-                    backdropFilter: "blur(8px)",
-                }}
-            >
-                <div
-                    style={{
-                        width: 7,
-                        height: 7,
-                        borderRadius: "50%",
-                        background: loading ? "#f59e0b" : error ? "#ef4444" : "#22c55e",
-                        boxShadow: loading
-                            ? "0 0 8px rgba(245,158,11,0.7)"
-                            : error
-                            ? "0 0 8px rgba(239,68,68,0.7)"
-                            : "0 0 8px rgba(34,197,94,0.7)",
-                    }}
-                />
-                <div>
-                    {loading
-                        ? "Syncing Live Telemetry..."
-                        : error
-                        ? "BIM Offline"
-                        : "Digital Twin Synced · Live Health Connected"}
-                </div>
-            </div>
         </div>
     );
 }

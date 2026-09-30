@@ -319,6 +319,26 @@ def test_list_alerts_populated(client: TestClient, seeded_data: dict):
     assert data[0]["severity"] == "MEDIUM"
 
 
+def test_clear_active_alerts_endpoint(client: TestClient, seeded_data: dict):
+    """Test POST /api/v1/alerts/clear-active transitions active alerts to RESOLVED without deleting."""
+    response = client.post("/api/v1/alerts/clear-active")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["cleared_count"] == 1
+
+    # Verify no active alerts remain
+    active_resp = client.get("/api/v1/alerts?status=ACTIVE")
+    assert active_resp.status_code == 200
+    assert len(active_resp.json()) == 0
+
+    # Verify historical alert record persists with RESOLVED status
+    resolved_resp = client.get("/api/v1/alerts?status=RESOLVED")
+    assert resolved_resp.status_code == 200
+    assert len(resolved_resp.json()) == 1
+    assert resolved_resp.json()[0]["id"] == seeded_data["alert_id"]
+
+
+
 # ============================================================================
 # 7. HEALTH SUMMARY ENDPOINT TESTS
 # ============================================================================

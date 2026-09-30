@@ -193,6 +193,8 @@ export function useLiveTelemetry({
                 isPlaybackActiveRef.current = false;
                 setIsPlaybackActive(false);
                 activeRunRef.current = null;
+                setActiveStage(null);
+                setConnectionState("CONNECTED");
             }
         }, 500);
     }, [onCompleted]);
@@ -227,20 +229,21 @@ export function useLiveTelemetry({
         if (!currentRun) {
             isPlaybackActiveRef.current = false;
             setIsPlaybackActive(false);
+            setActiveStage(null);
             return;
         }
 
         // When all 9 stages have dwelled and completed:
         if (stageIdx > 9) {
-            if (currentRun.isBackendCompleted) {
+            if (currentRun.isBackendCompleted || currentRun.stages[9]?.completedEvent) {
                 finishRun(currentRun);
             } else if (currentRun.hasBackendError) {
                 handleRunError(currentRun);
             } else {
-                // Wait for backend completion event
+                // Safety timeout: finalize run if stage 9 completed
                 playbackTimerRef.current = setTimeout(() => {
-                    playStage(stageIdx);
-                }, 50);
+                    finishRun(currentRun);
+                }, 400);
             }
             return;
         }
@@ -287,8 +290,10 @@ export function useLiveTelemetry({
         playbackTimerRef.current = setTimeout(() => {
             if (isUnmountedRef.current) return;
 
+            let attempts = 0;
             const checkCompletion = () => {
                 if (isUnmountedRef.current) return;
+                attempts += 1;
                 const updatedRun = activeRunRef.current;
                 const updatedStage = updatedRun?.stages[stageIdx];
 
@@ -312,6 +317,21 @@ export function useLiveTelemetry({
                     }, completeMs);
                 } else if (updatedRun?.hasBackendError) {
                     handleRunError(updatedRun, stageIdx);
+                } else if (updatedRun?.isBackendCompleted || attempts >= 20) {
+                    // Fallback: If backend is completed or after 1000ms, mark completed and advance
+                    setStageStatuses((prev) => ({
+                        ...prev,
+                        [stageIdx]: {
+                            ...prev[stageIdx],
+                            status: "completed",
+                            summary: prev[stageIdx]?.summary || (updatedRun?.isBackendCompleted ? "Completed" : "Stage timeout"),
+                            timestamp: new Date().toISOString(),
+                        },
+                    }));
+                    playbackTimerRef.current = setTimeout(() => {
+                        if (isUnmountedRef.current) return;
+                        playStage(stageIdx + 1);
+                    }, completeMs);
                 } else {
                     // Wait briefly for completion event if still in transit
                     playbackTimerRef.current = setTimeout(checkCompletion, 50);
@@ -328,12 +348,25 @@ export function useLiveTelemetry({
     }, [playStage]);
 
     // Helper to find or associate target run
-    const findTargetRun = useCallback((traceId?: string | null): QueuedRun | null => {
-        if (activeRunRef.current && (!traceId || activeRunRef.current.runId === traceId)) {
-            return activeRunRef.current;
+    const findTargetRun = useCallback((traceId?: string | null, sequence?: number | null, sensorId?: string | null): QueuedRun | null => {
+        if (activeRunRef.current) {
+            if (!traceId || activeRunRef.current.runId === traceId) {
+                return activeRunRef.current;
+            }
+            if (sequence !== undefined && sequence !== null && activeRunRef.current.sequence === sequence) {
+                return activeRunRef.current;
+            }
+            if (sensorId && activeRunRef.current.sensorId === sensorId) {
+                return activeRunRef.current;
+            }
         }
-        if (pendingRunRef.current && (!traceId || pendingRunRef.current.runId === traceId)) {
-            return pendingRunRef.current;
+        if (pendingRunRef.current) {
+            if (!traceId || pendingRunRef.current.runId === traceId) {
+                return pendingRunRef.current;
+            }
+            if (sequence !== undefined && sequence !== null && pendingRunRef.current.sequence === sequence) {
+                return pendingRunRef.current;
+            }
         }
         return activeRunRef.current || pendingRunRef.current;
     }, []);
@@ -434,7 +467,7 @@ export function useLiveTelemetry({
                         case "stage_started": {
                             const stageIdx = event.stage_index ?? (event.stage ? STAGE_NAMES.indexOf(event.stage) + 1 : null);
                             if (stageIdx) {
-                                const targetRun = findTargetRun(event.trace_id);
+                                const targetRun = findTargetRun(event.trace_id, event.sequence, event.sensor_id);
                                 if (targetRun) {
                                     if (!targetRun.stages[stageIdx]) {
                                         targetRun.stages[stageIdx] = {};
@@ -448,7 +481,7 @@ export function useLiveTelemetry({
                         case "stage_completed": {
                             const stageIdx = event.stage_index ?? (event.stage ? STAGE_NAMES.indexOf(event.stage) + 1 : null);
                             if (stageIdx) {
-                                const targetRun = findTargetRun(event.trace_id);
+                                const targetRun = findTargetRun(event.trace_id, event.sequence, event.sensor_id);
                                 if (targetRun) {
                                     if (!targetRun.stages[stageIdx]) {
                                         targetRun.stages[stageIdx] = {};
@@ -460,7 +493,7 @@ export function useLiveTelemetry({
                         }
 
                         case "processing_completed": {
-                            const targetRun = findTargetRun(event.trace_id);
+                            const targetRun = findTargetRun(event.trace_id, event.sequence, event.sensor_id);
                             if (targetRun) {
                                 targetRun.isBackendCompleted = true;
                                 targetRun.completedTimestamp = event.timestamp;
@@ -480,7 +513,7 @@ export function useLiveTelemetry({
                         }
 
                         case "processing_error": {
-                            const targetRun = findTargetRun(event.trace_id);
+                            const targetRun = findTargetRun(event.trace_id, event.sequence, event.sensor_id);
                             if (targetRun) {
                                 targetRun.hasBackendError = true;
                                 targetRun.errorEvent = event;

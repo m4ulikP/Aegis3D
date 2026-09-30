@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from app.anomaly.calculator import DEFAULT_ANOMALY_Z_THRESHOLD, analyze_event
 from app.anomaly.exceptions import BaselineNotFoundError, InvalidEventDataError
 from app.anomaly.types import AnomalyAnalysisResult
+from app.models.baseline import Baseline
+from app.models.event import Event
 from app.repositories.baseline_repository import BaselineRepository
 from app.repositories.event_repository import EventRepository
 
@@ -51,3 +53,13 @@ class AnomalyService:
             raise BaselineNotFoundError(f"No Baseline found for zone id {event.zone_id}")
 
         return analyze_event(event=event, baseline=baseline, z_threshold=z_threshold)
+
+    def analyze_event(
+        self,
+        event: Event,
+        baseline: Baseline,
+        z_threshold: float = DEFAULT_ANOMALY_Z_THRESHOLD,
+    ) -> AnomalyAnalysisResult:
+        """Perform anomaly analysis on in-memory event and baseline."""
+        return analyze_event(event=event, baseline=baseline, z_threshold=z_threshold)
+

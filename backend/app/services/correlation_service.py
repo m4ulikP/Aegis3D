@@ -79,8 +79,11 @@ class CorrelationService:
         event_items: List[dict] = []
         for evt in events:
             if baseline and evt.magnitude is not None and evt.energy is not None:
-                anom_res = self.anomaly_service.analyze_event_by_id(evt.id)
-                is_anom = anom_res.is_anomalous
+                try:
+                    anom_res = self.anomaly_service.analyze_event(event=evt, baseline=baseline)
+                    is_anom = anom_res.is_anomalous
+                except Exception:
+                    is_anom = False
             else:
                 is_anom = False
 

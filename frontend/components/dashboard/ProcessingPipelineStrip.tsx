@@ -12,38 +12,9 @@ export default function ProcessingPipelineStrip({
     telemetry,
     onInspect,
 }: ProcessingPipelineStripProps) {
-    if (!telemetry) {
-        return (
-            <div
-                style={{
-                    background: "#080d1a",
-                    border: `1px solid ${theme.surfaces.border}`,
-                    borderRadius: 8,
-                    padding: "12px 14px",
-                    fontFamily: theme.typography.fontSans,
-                    fontSize: 11,
-                    color: theme.text.muted,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                }}
-            >
-                <div
-                    style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        background: "#64748b",
-                    }}
-                />
-                <div>PIPELINE IDLE · WAITING FOR SENSOR PACKET</div>
-            </div>
-        );
-    }
-
-    const hasEvents = telemetry.events_detected > 0;
-    const hasAnomaly = telemetry.events.some((e) => e.is_anomalous);
-    const firstEvent = telemetry.events[0];
+    const hasEvents = (telemetry?.events_detected ?? 0) > 0;
+    const hasAnomaly = telemetry?.events?.some((e) => e.is_anomalous) ?? false;
+    const firstEvent = telemetry?.events?.[0];
 
     const maxZScore = Math.max(
         Math.abs(firstEvent?.magnitude_z_score || 0),
@@ -51,187 +22,253 @@ export default function ProcessingPipelineStrip({
     );
 
     const hasExtractedFeatures =
-        telemetry.extracted_features !== null &&
-        telemetry.extracted_features !== undefined;
+        telemetry?.extracted_features !== null &&
+        telemetry?.extracted_features !== undefined;
 
     const isCorrelated =
-        telemetry.cross_sensor_correlation_confirmed === true;
+        telemetry?.cross_sensor_correlation_confirmed === true;
 
     const isPersistent =
-        telemetry.temporal_persistence_confirmed === true;
+        telemetry?.temporal_persistence_confirmed === true;
 
-    const hasAlert = telemetry.alert_generated;
+    const hasAlert = telemetry?.alert_generated ?? false;
 
-    const stages = [
-        {
-            num: "01",
-            name: "INGESTION",
-            state: "ACCEPTED",
-            statusColor: theme.status.normal,
-            evidence: `${telemetry.samples_count} pts @ ${telemetry.sample_rate_hz}Hz (seq #${telemetry.sequence ?? 0})`,
-        },
-        {
-            num: "02",
-            name: "CONDITIONING",
-            state: "COMPLETED",
-            statusColor: theme.status.normal,
-            evidence: "DC removal + moving-average preprocessing",
-        },
-        {
-            num: "03",
-            name: "EVENT DETECT",
-            state: hasEvents
-                ? `${telemetry.events_detected} DETECTED`
-                : "BELOW THRESHOLD",
-            statusColor: hasEvents
-                ? theme.status.warning
-                : theme.status.monitor,
-            evidence:
-                hasEvents && telemetry.extracted_features
-                    ? `Peak: ${telemetry.extracted_features.peak_amplitude.toFixed(
-                        2
-                    )} mm/s² (${telemetry.extracted_features.duration_ms.toFixed(
-                        0
-                    )}ms)`
-                    : `Activity < threshold (${telemetry.detection_threshold?.toFixed(2) ?? "1.00"
-                    })`,
-        },
-        {
-            num: "04",
-            name: "FEATURE EXTRACTION",
-            state: hasEvents
-                ? hasExtractedFeatures
-                    ? "EXTRACTED"
-                    : "NO FEATURES"
-                : "NOT TRIGGERED",
-            statusColor: !hasEvents
-                ? {
-                    bg: "rgba(100, 116, 139, 0.15)",
-                    text: "#94a3b8",
-                    border: "rgba(100, 116, 139, 0.3)",
-                }
-                : hasExtractedFeatures
-                    ? theme.status.normal
-                    : theme.status.monitor,
-            evidence:
-                hasExtractedFeatures && telemetry.extracted_features
-                    ? `Peak ${telemetry.extracted_features.peak_amplitude.toFixed(
-                        2
-                    )} · RMS ${telemetry.extracted_features.rms_amplitude.toFixed(
-                        2
-                    )} · Energy ${telemetry.extracted_features.energy.toFixed(
-                        2
-                    )}`
-                    : "No event features extracted",
-        },
-        {
-            num: "05",
-            name: "BASELINE REFERENCE",
-            state: "REFERENCED",
-            statusColor: theme.status.normal,
-            evidence:
-                "Zone baseline reference used for anomaly evaluation",
-        },
-        {
-            num: "06",
-            name: "ANOMALY EVAL",
-            state: !hasEvents
-                ? "NOT TRIGGERED"
-                : hasAnomaly
-                    ? `ANOMALOUS (${maxZScore.toFixed(1)}σ)`
-                    : "BASELINE NORMAL",
-            statusColor: !hasEvents
-                ? {
-                    bg: "rgba(100, 116, 139, 0.15)",
-                    text: "#94a3b8",
-                    border: "rgba(100, 116, 139, 0.3)",
-                }
-                : hasAnomaly
-                    ? theme.status.critical
-                    : theme.status.normal,
-            evidence: !hasEvents
-                ? "Sub-threshold signal bypassed"
-                : hasAnomaly
-                    ? `Z-Score: +${maxZScore.toFixed(2)}σ · ${firstEvent?.anomaly_reasons?.[0] ||
-                    "Statistical outlier"
-                    }`
-                    : "Signal within ±3.0σ baseline envelope",
-        },
-        {
-            num: "07",
-            name: "PERSISTENCE",
-            state: !hasEvents
-                ? "INACTIVE"
-                : isPersistent
-                    ? "CONFIRMED"
-                    : "NOT CONFIRMED",
-            statusColor: !hasEvents
-                ? {
-                    bg: "rgba(100, 116, 139, 0.15)",
-                    text: "#94a3b8",
-                    border: "rgba(100, 116, 139, 0.3)",
-                }
-                : isPersistent
+    const stages = !telemetry
+        ? [
+            {
+                num: "01",
+                name: "INGESTION",
+                state: "STANDBY",
+                statusColor: { bg: "rgba(100, 116, 139, 0.15)", text: "#94a3b8", border: "rgba(100, 116, 139, 0.3)" },
+                evidence: "Ingestion pipeline ready · Awaiting sensor packet",
+            },
+            {
+                num: "02",
+                name: "CONDITIONING",
+                state: "STANDBY",
+                statusColor: { bg: "rgba(100, 116, 139, 0.15)", text: "#94a3b8", border: "rgba(100, 116, 139, 0.3)" },
+                evidence: "DC removal + moving-average preprocessing ready",
+            },
+            {
+                num: "03",
+                name: "EVENT DETECT",
+                state: "STANDBY",
+                statusColor: { bg: "rgba(100, 116, 139, 0.15)", text: "#94a3b8", border: "rgba(100, 116, 139, 0.3)" },
+                evidence: "Energy threshold detector ready (1.00 mm/s²)",
+            },
+            {
+                num: "04",
+                name: "FEATURE EXTRACTION",
+                state: "STANDBY",
+                statusColor: { bg: "rgba(100, 116, 139, 0.15)", text: "#94a3b8", border: "rgba(100, 116, 139, 0.3)" },
+                evidence: "FFT, RMS, Peak-to-Peak feature engine ready",
+            },
+            {
+                num: "05",
+                name: "BASELINE REFERENCE",
+                state: "STANDBY",
+                statusColor: { bg: "rgba(100, 116, 139, 0.15)", text: "#94a3b8", border: "rgba(100, 116, 139, 0.3)" },
+                evidence: "Spatial zone baseline envelope referenced",
+            },
+            {
+                num: "06",
+                name: "ANOMALY EVAL",
+                state: "STANDBY",
+                statusColor: { bg: "rgba(100, 116, 139, 0.15)", text: "#94a3b8", border: "rgba(100, 116, 139, 0.3)" },
+                evidence: "Z-score statistical variance engine ready",
+            },
+            {
+                num: "07",
+                name: "PERSISTENCE",
+                state: "STANDBY",
+                statusColor: { bg: "rgba(100, 116, 139, 0.15)", text: "#94a3b8", border: "rgba(100, 116, 139, 0.3)" },
+                evidence: "Multi-packet temporal buffer ready",
+            },
+            {
+                num: "08",
+                name: "CORRELATION",
+                state: "STANDBY",
+                statusColor: { bg: "rgba(100, 116, 139, 0.15)", text: "#94a3b8", border: "rgba(100, 116, 139, 0.3)" },
+                evidence: "Cross-sensor spatial correlation matrix ready",
+            },
+            {
+                num: "09",
+                name: "HEALTH & ALERT",
+                state: "STANDBY",
+                statusColor: { bg: "rgba(100, 116, 139, 0.15)", text: "#94a3b8", border: "rgba(100, 116, 139, 0.3)" },
+                evidence: "Structural Health Indicator scoring engine ready",
+            },
+        ]
+        : [
+            {
+                num: "01",
+                name: "INGESTION",
+                state: "ACCEPTED",
+                statusColor: theme.status.normal,
+                evidence: `${telemetry.samples_count} pts @ ${telemetry.sample_rate_hz}Hz (seq #${telemetry.sequence ?? 0})`,
+            },
+            {
+                num: "02",
+                name: "CONDITIONING",
+                state: "COMPLETED",
+                statusColor: theme.status.normal,
+                evidence: "DC removal + moving-average preprocessing",
+            },
+            {
+                num: "03",
+                name: "EVENT DETECT",
+                state: hasEvents
+                    ? `${telemetry.events_detected} DETECTED`
+                    : "BELOW THRESHOLD",
+                statusColor: hasEvents
                     ? theme.status.warning
                     : theme.status.monitor,
-            evidence: isPersistent
-                ? "Multiple anomalous bursts within persistence window"
-                : hasEvents
-                    ? "Persistence threshold not confirmed"
-                    : "No events detected in current packet",
-        },
-        {
-            num: "08",
-            name: "CORRELATION",
-            state: !hasEvents
-                ? "INACTIVE"
-                : isCorrelated
-                    ? "CONFIRMED (2-PZT)"
-                    : "NOT CORRELATED",
-            statusColor: !hasEvents
-                ? {
-                    bg: "rgba(100, 116, 139, 0.15)",
-                    text: "#94a3b8",
-                    border: "rgba(100, 116, 139, 0.3)",
-                }
-                : isCorrelated
-                    ? theme.status.critical
-                    : theme.status.monitor,
-            evidence: isCorrelated
-                ? "Multi-node spatial coincidence verified"
-                : hasEvents
-                    ? "No cross-sensor correlation confirmed"
-                    : "No events detected in current packet",
-        },
-        {
-            num: "09",
-            name: "HEALTH & ALERT",
-            state:
-                telemetry.health_score !== null &&
-                    telemetry.health_score !== undefined
-                    ? hasAlert
-                        ? `ALERT #${telemetry.alert_id}`
-                        : `${telemetry.health_score.toFixed(1)} / 100`
-                    : "UNMODIFIED",
-            statusColor: hasAlert
-                ? theme.status.critical
-                : telemetry.health_status === "HIGH_PRIORITY_INSPECTION" ||
-                    telemetry.health_status === "INSPECTION_ADVISED"
-                    ? theme.status.critical
-                    : telemetry.health_status === "MONITOR"
-                        ? theme.status.warning
+                evidence:
+                    hasEvents && telemetry.extracted_features
+                        ? `Peak: ${telemetry.extracted_features.peak_amplitude.toFixed(
+                            2
+                        )} mm/s² (${telemetry.extracted_features.duration_ms.toFixed(
+                            0
+                        )}ms)`
+                        : `Activity < threshold (${telemetry.detection_threshold?.toFixed(2) ?? "1.00"
+                        })`,
+            },
+            {
+                num: "04",
+                name: "FEATURE EXTRACTION",
+                state: hasEvents
+                    ? hasExtractedFeatures
+                        ? "EXTRACTED"
+                        : "NO FEATURES"
+                    : "NOT TRIGGERED",
+                statusColor: !hasEvents
+                    ? {
+                        bg: "rgba(100, 116, 139, 0.15)",
+                        text: "#94a3b8",
+                        border: "rgba(100, 116, 139, 0.3)",
+                    }
+                    : hasExtractedFeatures
+                        ? theme.status.normal
+                        : theme.status.monitor,
+                evidence:
+                    hasExtractedFeatures && telemetry.extracted_features
+                        ? `Peak ${telemetry.extracted_features.peak_amplitude.toFixed(
+                            2
+                        )} · RMS ${telemetry.extracted_features.rms_amplitude.toFixed(
+                            2
+                        )} · Energy ${telemetry.extracted_features.energy.toFixed(
+                            2
+                        )}`
+                        : "No event features extracted",
+            },
+            {
+                num: "05",
+                name: "BASELINE REFERENCE",
+                state: "REFERENCED",
+                statusColor: theme.status.normal,
+                evidence:
+                    "Zone baseline reference used for anomaly evaluation",
+            },
+            {
+                num: "06",
+                name: "ANOMALY EVAL",
+                state: !hasEvents
+                    ? "NOT TRIGGERED"
+                    : hasAnomaly
+                        ? `ANOMALOUS (${maxZScore.toFixed(1)}σ)`
+                        : "BASELINE NORMAL",
+                statusColor: !hasEvents
+                    ? {
+                        bg: "rgba(100, 116, 139, 0.15)",
+                        text: "#94a3b8",
+                        border: "rgba(100, 116, 139, 0.3)",
+                    }
+                    : hasAnomaly
+                        ? theme.status.critical
                         : theme.status.normal,
-            evidence: hasAlert
-                ? `${telemetry.alert_severity || "HIGH"}: ${telemetry.alert_title || "Structural degradation"
-                }`
-                : telemetry.health_status
-                    ? `SHI: ${telemetry.health_score?.toFixed(
-                        1
-                    )} / 100 · Status: ${telemetry.health_status
-                    } (${telemetry.health_trend || "STABLE"})`
-                    : "Health index unchanged (no event)",
-        },
-    ];
+                evidence: !hasEvents
+                    ? "Sub-threshold signal bypassed"
+                    : hasAnomaly
+                        ? `Z-Score: +${maxZScore.toFixed(2)}σ · ${firstEvent?.anomaly_reasons?.[0] ||
+                        "Statistical outlier"
+                        }`
+                        : "Signal within ±3.0σ baseline envelope",
+            },
+            {
+                num: "07",
+                name: "PERSISTENCE",
+                state: !hasEvents
+                    ? "INACTIVE"
+                    : isPersistent
+                        ? "CONFIRMED"
+                        : "NOT CONFIRMED",
+                statusColor: !hasEvents
+                    ? {
+                        bg: "rgba(100, 116, 139, 0.15)",
+                        text: "#94a3b8",
+                        border: "rgba(100, 116, 139, 0.3)",
+                    }
+                    : isPersistent
+                        ? theme.status.warning
+                        : theme.status.monitor,
+                evidence: isPersistent
+                    ? "Multiple anomalous bursts within persistence window"
+                    : hasEvents
+                        ? "Persistence threshold not confirmed"
+                        : "No events detected in current packet",
+            },
+            {
+                num: "08",
+                name: "CORRELATION",
+                state: !hasEvents
+                    ? "INACTIVE"
+                    : isCorrelated
+                        ? "CONFIRMED (2-PZT)"
+                        : "NOT CORRELATED",
+                statusColor: !hasEvents
+                    ? {
+                        bg: "rgba(100, 116, 139, 0.15)",
+                        text: "#94a3b8",
+                        border: "rgba(100, 116, 139, 0.3)",
+                    }
+                    : isCorrelated
+                        ? theme.status.critical
+                        : theme.status.monitor,
+                evidence: isCorrelated
+                    ? "Multi-node spatial coincidence verified"
+                    : hasEvents
+                        ? "No cross-sensor correlation confirmed"
+                        : "No events detected in current packet",
+            },
+            {
+                num: "09",
+                name: "HEALTH & ALERT",
+                state:
+                    telemetry.health_score !== null &&
+                        telemetry.health_score !== undefined
+                        ? hasAlert
+                            ? `ALERT #${telemetry.alert_id}`
+                            : `${telemetry.health_score.toFixed(1)} / 100`
+                        : "UNMODIFIED",
+                statusColor: hasAlert
+                    ? theme.status.critical
+                    : telemetry.health_status === "HIGH_PRIORITY_INSPECTION" ||
+                        telemetry.health_status === "INSPECTION_ADVISED"
+                        ? theme.status.critical
+                        : telemetry.health_status === "MONITOR"
+                            ? theme.status.warning
+                            : theme.status.normal,
+                evidence: hasAlert
+                    ? `${telemetry.alert_severity || "HIGH"}: ${telemetry.alert_title || "Structural degradation"
+                    }`
+                    : telemetry.health_status
+                        ? `SHI: ${telemetry.health_score?.toFixed(
+                            1
+                        )} / 100 · Status: ${telemetry.health_status
+                        } (${telemetry.health_trend || "STABLE"})`
+                        : "Health index unchanged (no event)",
+            },
+        ];
 
     return (
         <div
@@ -270,7 +307,12 @@ export default function ProcessingPipelineStrip({
                 >
                     {onInspect && (
                         <button
-                            onClick={onInspect}
+                            type="button"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onInspect();
+                            }}
                             style={{
                                 border: "1px solid rgba(56, 189, 248, 0.4)",
                                 background: "rgba(56, 189, 248, 0.15)",

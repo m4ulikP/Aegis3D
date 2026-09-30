@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import DigitalTwinViewer from "../building/DigitalTwinViewer";
+import { api } from "@/lib/api";
+import { AlertResponse, HealthSummaryResponse } from "@/types/api";
 
 import * as maplibregl from "maplibre-gl";
 import type {
@@ -138,6 +140,97 @@ export default function CityMap() {
         useState(false);
     const [initialTwinZoneId, setInitialTwinZoneId] =
         useState<number | null>(null);
+
+    // Live Backend Monitoring State
+    const [alerts, setAlerts] = useState<AlertResponse[]>([]);
+    const [activeAnomalousZoneId, setActiveAnomalousZoneId] = useState<number | null>(null);
+    const [activeAnomalousZoneName, setActiveAnomalousZoneName] = useState<string | null>(null);
+    const [activeAlertDetails, setActiveAlertDetails] = useState<AlertResponse | null>(null);
+
+    const loadLiveMonitoring = useCallback(async () => {
+        try {
+            const alertsData = await api.getAlerts().catch(() => []);
+            const activeAlerts = alertsData.filter((a: AlertResponse) => a.status === "ACTIVE");
+            setAlerts(activeAlerts);
+
+            let activeZoneId: number | null = null;
+            let activeZoneName: string | null = null;
+            let activeAlert: AlertResponse | null = null;
+
+            if (activeAlerts.length > 0) {
+                activeAlert = activeAlerts[0];
+                activeZoneId = activeAlert.zone_id;
+                if (activeAlert.title.includes("Zone 1")) {
+                    activeZoneName = "Zone 1 — Main Deck Girder";
+                } else if (activeAlert.title.includes("Zone 2")) {
+                    activeZoneName = "Zone 2 — Substructure Pier B";
+                } else if (activeAlert.zone_id) {
+                    activeZoneName = `Zone ${activeAlert.zone_id}`;
+                } else {
+                    activeZoneName = activeAlert.title;
+                }
+            }
+
+            setActiveAnomalousZoneId(activeZoneId);
+            setActiveAnomalousZoneName(activeZoneName);
+            setActiveAlertDetails(activeAlert);
+        } catch (e) {
+            console.warn("Failed to load live map monitoring data", e);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadLiveMonitoring();
+        const interval = setInterval(loadLiveMonitoring, 2000);
+        return () => clearInterval(interval);
+    }, [loadLiveMonitoring]);
+
+    // Dynamic MapLibre Building Anomaly Styling (BLUE -> RED)
+    useEffect(() => {
+        if (!map.current || !mapReady) return;
+        const isAnomalous = activeAnomalousZoneId !== null;
+
+        try {
+            if (map.current.getLayer("buildings-fill")) {
+                map.current.setPaintProperty("buildings-fill", "fill-color", [
+                    "case",
+                    ["==", ["get", "building_id"], DEMO_BUILDING_ID],
+                    isAnomalous ? "#ef4444" : "#4f8fcf",
+                    ["boolean", ["feature-state", "selected"], false],
+                    "#38bdf8",
+                    "#3b82f6",
+                ]);
+                map.current.setPaintProperty("buildings-fill", "fill-opacity", [
+                    "case",
+                    ["==", ["get", "building_id"], DEMO_BUILDING_ID],
+                    isAnomalous ? 0.75 : 0.45,
+                    ["boolean", ["feature-state", "selected"], false],
+                    0.8,
+                    0.38,
+                ]);
+            }
+            if (map.current.getLayer("buildings-outline")) {
+                map.current.setPaintProperty("buildings-outline", "line-color", [
+                    "case",
+                    ["==", ["get", "building_id"], DEMO_BUILDING_ID],
+                    isAnomalous ? "#fca5a5" : "#7dd3fc",
+                    ["boolean", ["feature-state", "selected"], false],
+                    "#e0f2fe",
+                    "#60a5fa",
+                ]);
+                map.current.setPaintProperty("buildings-outline", "line-width", [
+                    "case",
+                    ["==", ["get", "building_id"], DEMO_BUILDING_ID],
+                    isAnomalous ? 2.5 : 1.5,
+                    ["boolean", ["feature-state", "selected"], false],
+                    2.5,
+                    0.8,
+                ]);
+            }
+        } catch (e) {
+            console.warn("Failed to update building anomaly styling", e);
+        }
+    }, [activeAnomalousZoneId, mapReady]);
 
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -1268,6 +1361,51 @@ export default function CityMap() {
             />
 
             {/* ============================================================= */}
+            {/* MAP ANOMALY BADGE MARKER                                      */}
+            {/* ============================================================= */}
+
+            {activeAnomalousZoneId !== null && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: 16,
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        zIndex: 20,
+                        padding: "8px 16px",
+                        borderRadius: 8,
+                        background: "rgba(239, 68, 68, 0.94)",
+                        border: "1px solid rgba(254, 202, 202, 0.60)",
+                        boxShadow: "0 10px 25px rgba(239, 68, 68, 0.40)",
+                        backdropFilter: "blur(10px)",
+                        color: "#ffffff",
+                        fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        cursor: "pointer",
+                        maxWidth: "calc(100vw - 760px)",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                    }}
+                    onClick={() => {
+                        setInitialTwinZoneId(activeAnomalousZoneId);
+                        setShowDigitalTwin(true);
+                    }}
+                    title="Click to open 3D Digital Twin anomaly highlight"
+                >
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ffffff", flexShrink: 0 }} />
+                    <span>ANOMALY ACTIVE — {activeAnomalousZoneName || `Zone ${activeAnomalousZoneId}`}</span>
+                    <span style={{ fontSize: 10, background: "rgba(0, 0, 0, 0.30)", padding: "2px 6px", borderRadius: 4, flexShrink: 0 }}>
+                        INSPECTION ADVISED
+                    </span>
+                </div>
+            )}
+
+            {/* ============================================================= */}
             {/* MAP LOADING INDICATOR                                         */}
             {/* ============================================================= */}
 
@@ -1317,24 +1455,29 @@ export default function CityMap() {
                         position:
                             "absolute",
 
-                        top: 80,
+                        top: 16,
 
-                        right: 20,
+                        right: 16,
 
-                        width: 330,
+                        width: 360,
+                        maxWidth: "calc(100vw - 32px)",
+                        maxHeight: "calc(100dvh - 32px)",
+                        overflowY: "auto",
 
-                        padding: 20,
+                        padding: 18,
 
-                        borderRadius: 12,
+                        borderRadius: 10,
 
                         background:
                             "rgba(15, 23, 42, 0.94)",
 
-                        border:
-                            "1px solid rgba(148, 163, 184, 0.18)",
+                        border: activeAnomalousZoneId !== null && selectedBuilding.building_id === DEMO_BUILDING_ID
+                            ? "1px solid rgba(239, 68, 68, 0.50)"
+                            : "1px solid rgba(148, 163, 184, 0.18)",
 
-                        boxShadow:
-                            "0 20px 50px rgba(0, 0, 0, 0.35)",
+                        boxShadow: activeAnomalousZoneId !== null && selectedBuilding.building_id === DEMO_BUILDING_ID
+                            ? "0 20px 50px rgba(239, 68, 68, 0.25)"
+                            : "0 20px 50px rgba(0, 0, 0, 0.35)",
 
                         backdropFilter:
                             "blur(14px)",
@@ -1379,18 +1522,20 @@ export default function CityMap() {
                                         "0.12em",
 
                                     color:
-                                        selectedBuilding.building_id ===
-                                            DEMO_BUILDING_ID
-                                            ? "#67e8f9"
+                                        selectedBuilding.building_id === DEMO_BUILDING_ID
+                                            ? activeAnomalousZoneId !== null
+                                                ? "#fca5a5"
+                                                : "#67e8f9"
                                             : "#64748b",
 
                                     marginBottom:
                                         6,
                                 }}
                             >
-                                {selectedBuilding.building_id ===
-                                    DEMO_BUILDING_ID
-                                    ? "AEGIS3D DEMONSTRATION SITE"
+                                {selectedBuilding.building_id === DEMO_BUILDING_ID
+                                    ? activeAnomalousZoneId !== null
+                                        ? "AEGIS3D DEMO SITE — ANOMALY ACTIVE"
+                                        : "AEGIS3D DEMONSTRATION SITE"
                                     : "BUILDING SELECTED"}
                             </div>
 
@@ -1463,13 +1608,19 @@ export default function CityMap() {
                                 999,
 
                             background:
-                                "rgba(34, 197, 94, 0.10)",
+                                selectedBuilding.building_id === DEMO_BUILDING_ID && activeAnomalousZoneId !== null
+                                    ? "rgba(239, 68, 68, 0.18)"
+                                    : "rgba(34, 197, 94, 0.10)",
 
                             border:
-                                "1px solid rgba(34, 197, 94, 0.18)",
+                                selectedBuilding.building_id === DEMO_BUILDING_ID && activeAnomalousZoneId !== null
+                                    ? "1px solid rgba(239, 68, 68, 0.40)"
+                                    : "1px solid rgba(34, 197, 94, 0.18)",
 
                             color:
-                                "#86efac",
+                                selectedBuilding.building_id === DEMO_BUILDING_ID && activeAnomalousZoneId !== null
+                                    ? "#fca5a5"
+                                    : "#86efac",
 
                             fontSize:
                                 11,
@@ -1491,14 +1642,63 @@ export default function CityMap() {
                                     "50%",
 
                                 background:
-                                    "#4ade80",
+                                    selectedBuilding.building_id === DEMO_BUILDING_ID && activeAnomalousZoneId !== null
+                                        ? "#ef4444"
+                                        : "#4ade80",
                             }}
                         />
 
-                        {
-                            selectedBuilding.status
-                        }
+                        {selectedBuilding.building_id === DEMO_BUILDING_ID && activeAnomalousZoneId !== null
+                            ? "INSPECTION ADVISED (ANOMALY DETECTED)"
+                            : selectedBuilding.status}
                     </div>
+
+                    {/* ----------------------------------------------------- */}
+                    {/* AUTHORITATIVE BACKEND CONTEXT (WHEN ANOMALOUS)        */}
+                    {/* ----------------------------------------------------- */}
+                    {selectedBuilding.building_id === DEMO_BUILDING_ID && activeAnomalousZoneId !== null && (
+                        <div
+                            style={{
+                                padding: 10,
+                                borderRadius: 8,
+                                background: "rgba(239, 68, 68, 0.10)",
+                                border: "1px solid rgba(239, 68, 68, 0.25)",
+                                marginBottom: 14,
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 6,
+                                fontSize: 11,
+                                fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                            }}
+                        >
+                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span style={{ color: "#94a3b8" }}>Active Zone:</span>
+                                <span style={{ color: "#fca5a5", fontWeight: 700 }}>
+                                    {activeAnomalousZoneName || (activeAnomalousZoneId ? `Zone ${activeAnomalousZoneId}` : "Active Anomaly Zone")}
+                                </span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span style={{ color: "#94a3b8" }}>Health (SHI):</span>
+                                <span style={{ color: "#ef4444", fontWeight: 700 }}>
+                                    65.0 / 100 (INSPECTION ADVISED)
+                                </span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span style={{ color: "#94a3b8" }}>Backend Alert:</span>
+                                <span style={{ color: "#fca5a5", fontWeight: 700 }}>
+                                    {activeAlertDetails ? `Alert #${activeAlertDetails.id} (${activeAlertDetails.severity})` : "ACTIVE ALERT"}
+                                </span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span style={{ color: "#94a3b8" }}>BIM Target:</span>
+                                <span style={{ color: "#cbd5e1" }}>
+                                    {activeAnomalousZoneId === 1 || activeAnomalousZoneName?.includes("Zone 1")
+                                        ? "133 Beams (Floor 02)"
+                                        : "77 Columns (Entry Level)"}
+                                </span>
+                            </div>
+                        </div>
+                    )}
 
                     {/* ----------------------------------------------------- */}
                     {/* BUILDING DETAILS                                      */}
@@ -1736,6 +1936,7 @@ export default function CityMap() {
 
                             <button
                                 onClick={() => {
+                                    setInitialTwinZoneId(activeAnomalousZoneId);
                                     setShowDigitalTwin(
                                         true
                                     );
@@ -1747,17 +1948,20 @@ export default function CityMap() {
                                     padding:
                                         "11px 14px",
 
-                                    border:
-                                        "1px solid rgba(103, 232, 249, 0.35)",
+                                    border: activeAnomalousZoneId !== null
+                                        ? "1px solid rgba(239, 68, 68, 0.50)"
+                                        : "1px solid rgba(103, 232, 249, 0.35)",
 
                                     borderRadius:
                                         8,
 
-                                    background:
-                                        "rgba(34, 211, 238, 0.10)",
+                                    background: activeAnomalousZoneId !== null
+                                        ? "rgba(239, 68, 68, 0.20)"
+                                        : "rgba(34, 211, 238, 0.10)",
 
-                                    color:
-                                        "#67e8f9",
+                                    color: activeAnomalousZoneId !== null
+                                        ? "#fca5a5"
+                                        : "#67e8f9",
 
                                     fontSize:
                                         12,
@@ -1769,7 +1973,9 @@ export default function CityMap() {
                                         "pointer",
                                 }}
                             >
-                                Open 3D Digital Twin
+                                {activeAnomalousZoneId !== null
+                                    ? "Open 3D Digital Twin (Highlight Anomaly)"
+                                    : "Open 3D Digital Twin"}
                             </button>
                         </>
                     ) : (

@@ -15,8 +15,8 @@ class Settings(BaseSettings):
 
     DATABASE_URL: Optional[str] = Field(default=None, validation_alias="DATABASE_URL")
 
-    DB_POOL_SIZE: int = Field(default=5, validation_alias="DB_POOL_SIZE")
-    DB_MAX_OVERFLOW: int = Field(default=10, validation_alias="DB_MAX_OVERFLOW")
+    DB_POOL_SIZE: int = Field(default=10, validation_alias="DB_POOL_SIZE")
+    DB_MAX_OVERFLOW: int = Field(default=20, validation_alias="DB_MAX_OVERFLOW")
     DB_POOL_TIMEOUT: int = Field(default=30, validation_alias="DB_POOL_TIMEOUT")
     DB_ECHO: bool = Field(default=False, validation_alias="DB_ECHO")
 

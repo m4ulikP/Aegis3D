@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import {
     AlertResponse,
@@ -50,9 +50,10 @@ export default function MonitoringOverlay() {
                 ]);
 
                 if (isMounted) {
+                    const activeAlerts = alertsData.filter((a: AlertResponse) => a.status === "ACTIVE");
                     setSummary(summaryData);
                     setZones(zonesData);
-                    setAlerts(alertsData);
+                    setAlerts(activeAlerts);
                     setLatestTelemetry(telData);
                     setLoading(false);
                 }
@@ -78,6 +79,54 @@ export default function MonitoringOverlay() {
     const hasCriticalAlert = alerts.some(
         (a) => a.severity === "CRITICAL" || a.severity === "HIGH"
     );
+
+    // Group active alerts by zone to avoid visually repetitive cards while showing accurate counts and latest state
+    const groupedAlerts = useMemo(() => {
+        const groupMap = new Map<number, {
+            zoneId: number;
+            zoneName: string;
+            count: number;
+            latestAlert: AlertResponse;
+            highestSeverity: string;
+        }>();
+
+        for (const alert of alerts) {
+            const zid = alert.zone_id ?? 0;
+            const existing = groupMap.get(zid);
+            if (!existing) {
+                const z = zones.find((item) => item.id === zid);
+                let zName = z?.name;
+                if (!zName) {
+                    if (alert.title.includes("Zone 1")) {
+                        zName = "Zone 1 — Main Deck Girder";
+                    } else if (alert.title.includes("Zone 2")) {
+                        zName = "Zone 2 — Substructure Pier B";
+                    } else if (zid) {
+                        zName = `Zone ${zid}`;
+                    } else {
+                        zName = alert.title;
+                    }
+                }
+                groupMap.set(zid, {
+                    zoneId: zid,
+                    zoneName: zName,
+                    count: 1,
+                    latestAlert: alert,
+                    highestSeverity: alert.severity,
+                });
+            } else {
+                existing.count += 1;
+                if (alert.id > existing.latestAlert.id) {
+                    existing.latestAlert = alert;
+                }
+                if (alert.severity === "CRITICAL" || (alert.severity === "HIGH" && existing.highestSeverity !== "CRITICAL")) {
+                    existing.highestSeverity = alert.severity;
+                }
+            }
+        }
+
+        return Array.from(groupMap.values());
+    }, [alerts, zones]);
 
     return (
         <aside
@@ -268,12 +317,12 @@ export default function MonitoringOverlay() {
                                 fontSize: "16px",
                                 fontWeight: 700,
                                 fontFamily: theme.typography.fontMono,
-                                color: (summary?.active_alerts_count ?? alerts.length) > 0
+                                color: alerts.length > 0
                                     ? theme.status.critical.text
                                     : theme.status.normal.text,
                             }}
                         >
-                            {loading ? "..." : summary?.active_alerts_count ?? alerts.length}
+                            {loading ? "..." : alerts.length}
                         </div>
                         <div style={{ fontSize: "9px", color: theme.text.muted, textTransform: "uppercase" }}>Alerts</div>
                     </div>
@@ -304,7 +353,7 @@ export default function MonitoringOverlay() {
                             fontWeight: 700,
                             color: theme.status.critical.text,
                             textTransform: "uppercase",
-                            marginBottom: "6px",
+                            marginBottom: "8px",
                             display: "flex",
                             justifyContent: "space-between",
                         }}
@@ -323,25 +372,48 @@ export default function MonitoringOverlay() {
                             paddingRight: "4px",
                         }}
                     >
-                        {alerts.map((alert) => (
+                        {groupedAlerts.map((group) => (
                             <div
-                                key={alert.id}
-                                onClick={() => openDigitalTwin(alert.zone_id)}
+                                key={group.zoneId}
+                                onClick={() => openDigitalTwin(group.zoneId)}
                                 style={{
                                     fontSize: "11px",
-                                    padding: "6px 8px",
-                                    background: "rgba(239, 68, 68, 0.1)",
-                                    border: "1px solid rgba(239, 68, 68, 0.25)",
+                                    padding: "8px 10px",
+                                    background: "rgba(239, 68, 68, 0.12)",
+                                    border: "1px solid rgba(239, 68, 68, 0.35)",
                                     borderRadius: "6px",
                                     cursor: "pointer",
                                     wordBreak: "break-word",
                                     overflowWrap: "anywhere",
+                                    transition: "all 0.15s ease",
                                 }}
                                 title="Click to view affected zone in 3D Digital Twin"
                             >
-                                <div style={{ fontWeight: 600, color: "#fca5a5" }}>{alert.title}</div>
-                                <div style={{ fontSize: "10px", color: "#cbd5e1", marginTop: "2px" }}>{alert.message}</div>
-                                <div style={{ fontSize: "9px", color: "#38bdf8", marginTop: "4px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "3px" }}>
+                                    <div style={{ fontWeight: 700, color: "#fca5a5", fontSize: "12px" }}>
+                                        {group.zoneName}
+                                    </div>
+                                    <span
+                                        style={{
+                                            fontSize: "9px",
+                                            fontFamily: theme.typography.fontMono,
+                                            fontWeight: 700,
+                                            padding: "1px 5px",
+                                            borderRadius: "3px",
+                                            background: group.highestSeverity === "CRITICAL" || group.highestSeverity === "HIGH" ? "#dc2626" : "#d97706",
+                                            color: "#ffffff",
+                                        }}
+                                    >
+                                        {group.highestSeverity}
+                                    </span>
+                                </div>
+                                <div style={{ fontSize: "10px", color: "#94a3b8", fontFamily: theme.typography.fontMono, marginBottom: "4px" }}>
+                                    Active alerts: <strong style={{ color: "#fca5a5" }}>{group.count}</strong> · Latest: <strong style={{ color: "#e2e8f0" }}>#{group.latestAlert.id}</strong>
+                                </div>
+                                <div style={{ fontSize: "10px", color: "#cbd5e1", lineHeight: 1.35 }}>
+                                    {group.latestAlert.message}
+                                </div>
+                                <div style={{ fontSize: "10px", color: "#38bdf8", fontWeight: 600, marginTop: "6px" }}>
                                     Inspect in 3D Twin →
                                 </div>
                             </div>

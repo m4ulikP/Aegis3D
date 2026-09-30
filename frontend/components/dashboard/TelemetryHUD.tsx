@@ -12,8 +12,6 @@ import {
 } from "@/types/api";
 import { theme } from "@/lib/theme";
 import SignalWaveform from "./SignalWaveform";
-import ProcessingPipelineStrip from "./ProcessingPipelineStrip";
-import TelemetryProcessingInspector from "./TelemetryProcessingInspector";
 
 interface TelemetryHUDProps {
     activeZoneId: number | null;
@@ -53,7 +51,6 @@ export default function TelemetryHUD({
     const [isLiveConnected, setIsLiveConnected] = useState<boolean>(true);
     const [lastSyncTime, setLastSyncTime] = useState<string>("Initializing...");
     const [selectedSensorId, setSelectedSensorId] = useState<string | null>(null);
-    const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(false);
 
     // Fetch live backend data
     const refreshData = useCallback(async () => {
@@ -73,8 +70,10 @@ export default function TelemetryHUD({
                 }),
             ]);
 
+            const activeAlerts = alertsData.filter((a: AlertResponse) => a.status === "ACTIVE");
+
             setTelemetry(latestTel);
-            setAlerts(alertsData);
+            setAlerts(activeAlerts);
             setZones(zonesData);
             setIsLiveConnected(true);
 
@@ -113,24 +112,12 @@ export default function TelemetryHUD({
         };
     }, [refreshData]);
 
-    if (isInspectorOpen) {
-        return (
-            <TelemetryProcessingInspector
-                telemetry={telemetry}
-                onClose={() => setIsInspectorOpen(false)}
-            />
-        );
-    }
 
     if (collapsed) {
         return (
             <button
                 onClick={onToggleCollapse}
                 style={{
-                    position: "absolute",
-                    top: 76,
-                    right: 20,
-                    zIndex: 20,
                     padding: "8px 12px",
                     background: theme.surfaces.panel,
                     backdropFilter: "blur(10px)",
@@ -162,36 +149,20 @@ export default function TelemetryHUD({
     const currentZoneName =
         telemetry?.zone_name ||
         zones.find((z) => z.id === activeZoneId)?.name ||
-        "Zone 1 - Main Deck Girder";
-    const currentSensorId = telemetry?.sensor_id || selectedSensorId || "PZT-Z01";
+        (activeZoneId === 2 ? "Zone 2 - Substructure Pier B" : "Zone 1 - Main Deck Girder");
+    const currentSensorId = telemetry?.sensor_id || selectedSensorId || (activeZoneId === 2 ? "PZT-Z01" : "PZT-Z05");
     const hasAnomaly = telemetry?.events.some((e) => e.is_anomalous) || false;
     const hasEvent = (telemetry?.events_detected || 0) > 0;
 
     return (
-        <aside
-            className="custom-scrollbar"
+        <div
             style={{
-                position: "absolute",
-                top: 76,
-                right: 20,
-                zIndex: 20,
-                width: 380,
-                maxWidth: "calc(100vw - 40px)",
-                maxHeight: "calc(100dvh - 96px)",
-                overflowY: "auto",
-                background: theme.surfaces.panel,
-                backdropFilter: "blur(14px)",
-                border: `1px solid ${hasAnomaly ? theme.surfaces.borderCritical : theme.surfaces.border}`,
-                borderRadius: 10,
-                padding: "14px 16px",
-                paddingRight: "8px",
+                width: "100%",
                 color: theme.text.primary,
-                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7)",
                 display: "flex",
                 flexDirection: "column",
                 gap: 12,
                 fontFamily: theme.typography.fontSans,
-                transition: "border-color 0.2s ease",
             }}
             aria-label="Mission-Critical Telemetry Engineering HUD"
         >
@@ -410,7 +381,7 @@ export default function TelemetryHUD({
                         No snapshot cached for {selectedSensorId || "this sensor node"}.
                     </div>
                     <div style={{ fontSize: 9, color: "#64748b", marginTop: 4 }}>
-                        Transmit from Virtual Sensor Simulator on Laptop 2
+                        Transmit telemetry from Virtual Sensor Simulator console
                     </div>
                 </div>
             )}
@@ -427,12 +398,77 @@ export default function TelemetryHUD({
                 height={115}
             />
 
-            {/* Processing Pipeline Progression Strip */}
-            <ProcessingPipelineStrip
-                telemetry={telemetry}
-                onInspect={() => setIsInspectorOpen(true)}
-            />
+            {/* Stable Processing State Snapshot Card */}
+            <div
+                style={{
+                    background: "rgba(15, 23, 42, 0.6)",
+                    border: `1px solid ${theme.surfaces.border}`,
+                    borderRadius: 8,
+                    padding: "10px 12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    fontFamily: theme.typography.fontSans,
+                }}
+            >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: theme.text.secondary, letterSpacing: "0.04em" }}>
+                        LATEST PROCESSING SNAPSHOT
+                    </span>
+                    <span
+                        style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            fontFamily: theme.typography.fontMono,
+                            padding: "1px 6px",
+                            borderRadius: 4,
+                            background: hasAnomaly ? "rgba(239, 68, 68, 0.15)" : "rgba(56, 189, 248, 0.15)",
+                            color: hasAnomaly ? "#f87171" : "#38bdf8",
+                            border: `1px solid ${hasAnomaly ? "rgba(239, 68, 68, 0.35)" : "rgba(56, 189, 248, 0.35)"}`,
+                        }}
+                    >
+                        {hasAnomaly ? "ANOMALY EVALUATED" : "NOMINAL"}
+                    </span>
+                </div>
 
+                <div
+                    style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 6,
+                        fontSize: 10,
+                        fontFamily: theme.typography.fontMono,
+                    }}
+                >
+                    <div style={{ background: "rgba(15, 23, 42, 0.5)", padding: "5px 8px", borderRadius: 4, border: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                        <span style={{ color: theme.text.muted, display: "block", fontSize: 9 }}>STATUS</span>
+                        <span style={{ fontWeight: 700, color: hasAnomaly ? "#f87171" : hasEvent ? "#38bdf8" : "#94a3b8" }}>
+                            {telemetry?.status || "STANDBY"}
+                        </span>
+                    </div>
+
+                    <div style={{ background: "rgba(15, 23, 42, 0.5)", padding: "5px 8px", borderRadius: 4, border: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                        <span style={{ color: theme.text.muted, display: "block", fontSize: 9 }}>ANOMALY STATE</span>
+                        <span style={{ fontWeight: 700, color: hasAnomaly ? "#f87171" : "#4ade80" }}>
+                            {hasAnomaly ? "ANOMALY DETECTED" : "NOMINAL (NO ANOMALY)"}
+                        </span>
+                    </div>
+
+                    <div style={{ background: "rgba(15, 23, 42, 0.5)", padding: "5px 8px", borderRadius: 4, border: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                        <span style={{ color: theme.text.muted, display: "block", fontSize: 9 }}>PERSISTENCE</span>
+                        <span style={{ fontWeight: 700, color: telemetry?.temporal_persistence_confirmed ? "#f59e0b" : "#94a3b8" }}>
+                            {telemetry?.temporal_persistence_confirmed ? "CONFIRMED" : "NOT CONFIRMED"}
+                        </span>
+                    </div>
+
+                    <div style={{ background: "rgba(15, 23, 42, 0.5)", padding: "5px 8px", borderRadius: 4, border: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                        <span style={{ color: theme.text.muted, display: "block", fontSize: 9 }}>CORRELATION</span>
+                        <span style={{ fontWeight: 700, color: telemetry?.cross_sensor_correlation_confirmed ? "#ef4444" : "#94a3b8" }}>
+                            {telemetry?.cross_sensor_correlation_confirmed ? "CORRELATED (2-PZT)" : "NOT CORRELATED"}
+                        </span>
+                    </div>
+                </div>
+            </div>
 
             {/* Structural Health (SHI) Card */}
             {zoneHealth && (
@@ -575,6 +611,6 @@ export default function TelemetryHUD({
             >
                 Aegis3D Structural Health Indicator represents algorithmic evaluation of sensor telemetry. Does not constitute certified structural failure certification.
             </div>
-        </aside>
+        </div>
     );
 }

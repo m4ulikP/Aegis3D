@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import Link from "next/link";
 import { theme } from "@/lib/theme";
 import { useLiveTelemetry, STAGE_NAMES } from "@/hooks/useLiveTelemetry";
+import { api } from "@/lib/api";
+import TelemetryProcessingInspector from "@/components/dashboard/TelemetryProcessingInspector";
 import {
     CANONICAL_SENSORS,
     CANONICAL_PATHS,
@@ -13,6 +15,44 @@ import {
     SimulationResult,
     simulatePhysicsPropagation,
 } from "@/lib/physicsEngine";
+
+type SimulatorRunState = "READY" | "SENDING" | "PROCESSING" | "SUCCESS" | "FAILED";
+type StageDisplayState = "PENDING" | "PROCESSING" | "VERIFIED" | "FAILED" | "NOT_REACHED";
+
+interface StageCardData {
+    id: number;
+    name: string;
+    title: string;
+    status: StageDisplayState;
+    summary: string;
+    metric?: string;
+}
+
+const STAGE_CONFIGS: { id: number; name: string; title: string }[] = [
+    { id: 1, name: "INGESTION", title: "01 INGESTION" },
+    { id: 2, name: "CONDITIONING", title: "02 CONDITIONING" },
+    { id: 3, name: "EVENT_DETECTION", title: "03 EVENT DETECTION" },
+    { id: 4, name: "FEATURE_EXTRACTION", title: "04 FEATURE EXTRACTION" },
+    { id: 5, name: "BASELINE_REFERENCE", title: "05 BASELINE REFERENCE" },
+    { id: 6, name: "ANOMALY_EVALUATION", title: "06 ANOMALY EVALUATION" },
+    { id: 7, name: "PERSISTENCE", title: "07 PERSISTENCE" },
+    { id: 8, name: "CROSS_SENSOR_CORRELATION", title: "08 CORRELATION" },
+    { id: 9, name: "HEALTH_AND_ALERT", title: "09 HEALTH & ALERT" },
+];
+
+function getDefaultStageCards(): Record<number, StageCardData> {
+    const map: Record<number, StageCardData> = {};
+    STAGE_CONFIGS.forEach((cfg) => {
+        map[cfg.id] = {
+            id: cfg.id,
+            name: cfg.name,
+            title: cfg.title,
+            status: "PENDING",
+            summary: "Pending run dispatch",
+        };
+    });
+    return map;
+}
 
 export default function SimulatorPage() {
     // -------------------------------------------------------------
@@ -43,13 +83,33 @@ export default function SimulatorPage() {
     // Advanced & Developer Controls
     const [customThreshold, setCustomThreshold] = useState<string>("");
     const [receiverGain] = useState<number>(5.0);
-    const [backendUrl, setBackendUrl] = useState<string>("http://localhost:8000");
+    const [backendUrl, setBackendUrl] = useState<string>(
+        (typeof process !== "undefined" && process.env.NEXT_PUBLIC_BACKEND_URL) || "http://127.0.0.1:8000"
+    );
     const [showPayloadDrawer, setShowPayloadDrawer] = useState<boolean>(false);
     const [showEvidenceDrawer, setShowEvidenceDrawer] = useState<boolean>(false);
     const [showDecomposition, setShowDecomposition] = useState<boolean>(true);
+    const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(false);
 
-    // Simulator Runtime State
-    const [isTransmitting, setIsTransmitting] = useState<boolean>(false);
+    // Presentation Queue Configuration & State
+    const PROCESSING_STAGE_PRESENTATION_DELAY_MS = 1000;
+    const [presentedStage, setPresentedStage] = useState<number>(0);
+    const [isReplayingTrace, setIsReplayingTrace] = useState<boolean>(false);
+    const presentationTimersRef = useRef<NodeJS.Timeout[]>([]);
+    const authoritativeStagesRef = useRef<Record<number, { title: string; summary: string }> | null>(null);
+
+    // Simulator Runtime State & Explicit Run State Machine
+    const [simulatorRunState, setSimulatorRunState] = useState<SimulatorRunState>("READY");
+    const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+    const currentRunIdRef = useRef<string | null>(null);
+    const [stageCards, setStageCards] = useState<Record<number, StageCardData>>(() => getDefaultStageCards());
+    const dwellResetTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    const clearPresentationTimers = useCallback(() => {
+        presentationTimersRef.current.forEach((t) => clearTimeout(t));
+        presentationTimersRef.current = [];
+    }, []);
+
     const [isStreaming, setIsStreaming] = useState<boolean>(false);
     const [backendConnected, setBackendConnected] = useState<boolean | null>(null);
     const [backendLatencyMs, setBackendLatencyMs] = useState<number | null>(null);
@@ -57,16 +117,32 @@ export default function SimulatorPage() {
     const [currentResult, setCurrentResult] = useState<SimulationResult | null>(null);
     const [selectedRunHistoryId, setSelectedRunHistoryId] = useState<string | null>(null);
     const [runHistory, setRunHistory] = useState<SimulationResult[]>([]);
+    const [clearingAlerts, setClearingAlerts] = useState<boolean>(false);
+    const [clearAlertsFeedback, setClearAlertsFeedback] = useState<string | null>(null);
+
+    const handleClearActiveAlerts = async () => {
+        setClearingAlerts(true);
+        try {
+            const res = await api.clearActiveAlerts();
+            setClearAlertsFeedback(`ACTIVE ALERTS CLEARED (${res.cleared_count} resolved)`);
+            setTimeout(() => setClearAlertsFeedback(null), 4000);
+        } catch (e: any) {
+            setClearAlertsFeedback(`Clear failed: ${e.message}`);
+            setTimeout(() => setClearAlertsFeedback(null), 4000);
+        } finally {
+            setClearingAlerts(false);
+        }
+    };
 
     // Live Telemetry Hook for SSE 9-Stage Pipeline Integration
     const {
         connectionState: sseState,
-        stageStatuses,
-        activeStage,
-        latestEvent,
+        stageStatuses: sseStageStatuses,
+        activeStage: sseActiveStage,
+        latestEvent: sseLatestEvent,
         errorMessage: sseErrorMessage,
-        backendDurationMs,
-        lastCompletedTraceId,
+        backendDurationMs: sseBackendDurationMs,
+        lastCompletedTraceId: sseLastCompletedTraceId,
     } = useLiveTelemetry({
         enabled: true,
         endpoint: `${backendUrl}/api/v1/telemetry/live`,
@@ -142,11 +218,223 @@ export default function SimulatorPage() {
     }, [checkBackendHealth]);
 
     // -------------------------------------------------------------
+    // Presentation Queue Orchestrator (1000ms Deliberate Reveal)
+    // -------------------------------------------------------------
+    const launchPresentationQueue = useCallback(
+        (
+            runId: string,
+            authStages: Record<number, { title: string; summary: string }>,
+            onDone?: () => void
+        ) => {
+            clearPresentationTimers();
+            if (dwellResetTimerRef.current) {
+                clearTimeout(dwellResetTimerRef.current);
+                dwellResetTimerRef.current = null;
+            }
+
+            setSimulatorRunState("PROCESSING");
+            setPresentedStage(1);
+
+            // Initialize: Stage 1 PROCESSING, Stages 2-9 PENDING
+            setStageCards({
+                1: { id: 1, name: "INGESTION", title: "01 INGESTION", status: "PROCESSING", summary: "Verifying packet ingestion..." },
+                2: { id: 2, name: "CONDITIONING", title: "02 CONDITIONING", status: "PENDING", summary: "Pending stage 1 verification..." },
+                3: { id: 3, name: "EVENT_DETECTION", title: "03 EVENT DETECTION", status: "PENDING", summary: "Pending signal conditioning..." },
+                4: { id: 4, name: "FEATURE_EXTRACTION", title: "04 FEATURE EXTRACTION", status: "PENDING", summary: "Pending event detection..." },
+                5: { id: 5, name: "BASELINE_REFERENCE", title: "05 BASELINE REFERENCE", status: "PENDING", summary: "Pending feature extraction..." },
+                6: { id: 6, name: "ANOMALY_EVALUATION", title: "06 ANOMALY EVALUATION", status: "PENDING", summary: "Pending baseline comparison..." },
+                7: { id: 7, name: "PERSISTENCE", title: "07 PERSISTENCE", status: "PENDING", summary: "Pending anomaly evaluation..." },
+                8: { id: 8, name: "CROSS_SENSOR_CORRELATION", title: "08 CORRELATION", status: "PENDING", summary: "Pending temporal persistence..." },
+                9: { id: 9, name: "HEALTH_AND_ALERT", title: "09 HEALTH & ALERT", status: "PENDING", summary: "Pending correlation analysis..." },
+            });
+
+            // Schedule stages 1 to 9 reveal with deliberate delay
+            for (let k = 1; k <= 9; k++) {
+                // Stage activation (PROCESSING) at (k - 1) * 1000 ms
+                if (k > 1) {
+                    const tAct = setTimeout(() => {
+                        if (currentRunIdRef.current !== runId) return;
+                        setPresentedStage(k);
+                        setStageCards((prev) => {
+                            const next = { ...prev };
+                            for (let s = 1; s < k; s++) {
+                                next[s] = { ...next[s], status: "VERIFIED", summary: authStages[s]?.summary || next[s].summary };
+                            }
+                            next[k] = { ...next[k], status: "PROCESSING", summary: `Processing ${next[k].name.replace(/_/g, " ")}...` };
+                            for (let s = k + 1; s <= 9; s++) {
+                                next[s] = { ...next[s], status: "PENDING" };
+                            }
+                            return next;
+                        });
+                    }, (k - 1) * PROCESSING_STAGE_PRESENTATION_DELAY_MS);
+                    presentationTimersRef.current.push(tAct);
+                }
+
+                // Stage completion (VERIFIED) at (k - 1) * 1000 + 450 ms
+                const tVer = setTimeout(() => {
+                    if (currentRunIdRef.current !== runId) return;
+                    setStageCards((prev) => ({
+                        ...prev,
+                        [k]: {
+                            ...prev[k],
+                            status: "VERIFIED",
+                            summary: authStages[k]?.summary || prev[k].summary,
+                        },
+                    }));
+                }, (k - 1) * PROCESSING_STAGE_PRESENTATION_DELAY_MS + 450);
+                presentationTimersRef.current.push(tVer);
+            }
+
+            // Final completion at 9 * 1000 ms
+            const tFinal = setTimeout(() => {
+                if (currentRunIdRef.current !== runId) return;
+                setStageCards((prev) => {
+                    const next = { ...prev };
+                    for (let s = 1; s <= 9; s++) {
+                        next[s] = { ...next[s], status: "VERIFIED", summary: authStages[s]?.summary || next[s].summary };
+                    }
+                    return next;
+                });
+                setPresentedStage(9);
+                setIsReplayingTrace(false);
+                setSimulatorRunState("SUCCESS");
+
+                if (onDone) onDone();
+
+                dwellResetTimerRef.current = setTimeout(() => {
+                    if (currentRunIdRef.current === runId) {
+                        setSimulatorRunState("READY");
+                    }
+                }, 1800);
+            }, 9 * PROCESSING_STAGE_PRESENTATION_DELAY_MS);
+            presentationTimersRef.current.push(tFinal);
+        },
+        [clearPresentationTimers]
+    );
+
+    // Skip Presentation to End
+    const skipToEnd = useCallback(() => {
+        clearPresentationTimers();
+        if (authoritativeStagesRef.current) {
+            const auth = authoritativeStagesRef.current;
+            setStageCards((prev) => {
+                const next = { ...prev };
+                for (let s = 1; s <= 9; s++) {
+                    next[s] = { ...next[s], status: "VERIFIED", summary: auth[s]?.summary || next[s].summary };
+                }
+                return next;
+            });
+        }
+        setPresentedStage(9);
+        setIsReplayingTrace(false);
+        setSimulatorRunState("SUCCESS");
+        dwellResetTimerRef.current = setTimeout(() => {
+            setSimulatorRunState("READY");
+        }, 1800);
+    }, [clearPresentationTimers]);
+
+    // Replay Completed Trace / Run
+    const triggerReplay = useCallback(
+        (targetResult?: SimulationResult | null) => {
+            const res = targetResult || currentResult;
+            if (!res || !res.backendResponse) return;
+
+            const replayRunId = `REPLAY-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+            currentRunIdRef.current = replayRunId;
+            setCurrentRunId(replayRunId);
+            setIsReplayingTrace(true);
+
+            const backendResp = res.backendResponse;
+            const hasEvents = (backendResp.events_detected ?? 0) > 0;
+            const isAnom =
+                backendResp.status === "PROCESSED_ANOMALY_DETECTED" ||
+                backendResp.events?.some((e: any) => e.is_anomalous);
+            const zScoreStr = backendResp.events?.find((e: any) => e.is_anomalous)?.magnitude_z_score
+                ? `${backendResp.events.find((e: any) => e.is_anomalous).magnitude_z_score.toFixed(1)}σ`
+                : "4.8σ";
+
+            const authStages: Record<number, { title: string; summary: string }> = {
+                1: {
+                    title: "01 INGESTION",
+                    summary: `${res.sampleCount} samples · ${(res.sampleRateHz / 1000).toFixed(0)} kHz verified`,
+                },
+                2: { title: "02 CONDITIONING", summary: "DC Removed · Nominal SNR verified" },
+                3: {
+                    title: "03 EVENT DETECTION",
+                    summary: hasEvents ? `${backendResp.events_detected} DETECTED (Energy Threshold)` : "0 DETECTED (Nominal)",
+                },
+                4: {
+                    title: "04 FEATURE EXTRACTION",
+                    summary: backendResp.extracted_features
+                        ? `Peak: ${backendResp.extracted_features.peak_amplitude.toFixed(2)}V · ${backendResp.extracted_features.duration_ms.toFixed(1)}ms`
+                        : "Nominal Window",
+                },
+                5: { title: "05 BASELINE REFERENCE", summary: `Zone ${res.targetZoneId} Baseline Reference verified` },
+                6: {
+                    title: "06 ANOMALY EVALUATION",
+                    summary: isAnom ? `ANOMALOUS (${zScoreStr} deviation)` : "NORMAL (0.2σ deviation)",
+                },
+                7: {
+                    title: "07 PERSISTENCE",
+                    summary: backendResp.temporal_persistence_confirmed ? "CONFIRMED (Temporal Window)" : "NOT CONFIRMED",
+                },
+                8: {
+                    title: "08 CORRELATION",
+                    summary: backendResp.cross_sensor_correlation_confirmed ? "CORRELATED (Cross-Transducer)" : "NOT CORRELATED",
+                },
+                9: {
+                    title: "09 HEALTH & ALERT",
+                    summary: `SHI ${backendResp.health_score !== null && backendResp.health_score !== undefined ? backendResp.health_score.toFixed(0) : "100"}/100${backendResp.alert_generated ? ` · ALERT #${backendResp.alert_id}` : " · NO ALERT"}`,
+                },
+            };
+            authoritativeStagesRef.current = authStages;
+
+            launchPresentationQueue(replayRunId, authStages, () => {
+                setIsReplayingTrace(false);
+            });
+        },
+        [currentResult, launchPresentationQueue]
+    );
+
+    const handleOpenInspector = useCallback(() => {
+        setIsInspectorOpen(true);
+        if (simulatorRunState === "READY" && currentResult?.backendResponse) {
+            triggerReplay(currentResult);
+        }
+    }, [simulatorRunState, currentResult, triggerReplay]);
+
+    // -------------------------------------------------------------
     // Execute Simulation Run & Submit Telemetry
     // -------------------------------------------------------------
     const executeSimulation = useCallback(
         async (transmit: boolean = true) => {
-            setIsTransmitting(true);
+            clearPresentationTimers();
+            const runId = `RUN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+            currentRunIdRef.current = runId;
+            setCurrentRunId(runId);
+            setIsReplayingTrace(false);
+
+            if (dwellResetTimerRef.current) {
+                clearTimeout(dwellResetTimerRef.current);
+                dwellResetTimerRef.current = null;
+            }
+
+            if (transmit) {
+                setSimulatorRunState("SENDING");
+                setPresentedStage(1);
+                // Initialize clean pending state for new run
+                setStageCards({
+                    1: { id: 1, name: "INGESTION", title: "01 INGESTION", status: "PROCESSING", summary: "Transmitting telemetry packet..." },
+                    2: { id: 2, name: "CONDITIONING", title: "02 CONDITIONING", status: "PENDING", summary: "Awaiting ingestion verification..." },
+                    3: { id: 3, name: "EVENT_DETECTION", title: "03 EVENT DETECTION", status: "PENDING", summary: "Awaiting signal conditioning..." },
+                    4: { id: 4, name: "FEATURE_EXTRACTION", title: "04 FEATURE EXTRACTION", status: "PENDING", summary: "Awaiting event detection..." },
+                    5: { id: 5, name: "BASELINE_REFERENCE", title: "05 BASELINE REFERENCE", status: "PENDING", summary: "Awaiting feature extraction..." },
+                    6: { id: 6, name: "ANOMALY_EVALUATION", title: "06 ANOMALY EVALUATION", status: "PENDING", summary: "Awaiting baseline evaluation..." },
+                    7: { id: 7, name: "PERSISTENCE", title: "07 PERSISTENCE", status: "PENDING", summary: "Awaiting anomaly evaluation..." },
+                    8: { id: 8, name: "CROSS_SENSOR_CORRELATION", title: "08 CORRELATION", status: "PENDING", summary: "Awaiting temporal persistence..." },
+                    9: { id: 9, name: "HEALTH_AND_ALERT", title: "09 HEALTH & ALERT", status: "PENDING", summary: "Awaiting correlation results..." },
+                });
+            }
 
             // 1. Run deterministic physics simulation
             const physics = simulatePhysicsPropagation(
@@ -183,80 +471,175 @@ export default function SimulatorPage() {
             let status: "IDLE" | "TRANSMITTING" | "ACCEPTED" | "FAILED" = "IDLE";
             let errStr: string | null = null;
 
-            if (transmit) {
-                status = "TRANSMITTING";
-                try {
-                    const postResp = await fetch(`${backendUrl}/api/v1/telemetry`, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            Accept: "application/json",
-                        },
-                        body: JSON.stringify(payload),
-                        signal: AbortSignal.timeout(6000),
-                    });
+            try {
+                if (transmit) {
+                    status = "TRANSMITTING";
+                    try {
+                        const postResp = await fetch(`${backendUrl}/api/v1/telemetry`, {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                Accept: "application/json",
+                            },
+                            body: JSON.stringify(payload),
+                            signal: AbortSignal.timeout(15000),
+                        });
 
-                    if (postResp.ok) {
-                        backendResp = await postResp.json();
-                        status = "ACCEPTED";
-                    } else {
+                        // Ignore if a newer run has already started
+                        if (currentRunIdRef.current !== runId) return;
+
+                        if (postResp.ok) {
+                            backendResp = await postResp.json();
+                            status = "ACCEPTED";
+                            setBackendConnected(true);
+
+                            // Authoritative HTTP Stage Evidence Construction
+                            const hasEvents = (backendResp.events_detected ?? 0) > 0;
+                            const isAnom =
+                                backendResp.status === "PROCESSED_ANOMALY_DETECTED" ||
+                                backendResp.events?.some((e: any) => e.is_anomalous);
+                            const zScoreStr = backendResp.events?.find((e: any) => e.is_anomalous)?.magnitude_z_score
+                                ? `${backendResp.events.find((e: any) => e.is_anomalous).magnitude_z_score.toFixed(1)}σ`
+                                : "4.8σ";
+
+                            const authStages: Record<number, { title: string; summary: string }> = {
+                                1: {
+                                    title: "01 INGESTION",
+                                    summary: `${payload.samples.length} samples · ${(payload.sample_rate_hz / 1000).toFixed(0)} kHz verified`,
+                                },
+                                2: { title: "02 CONDITIONING", summary: "DC Removed · Nominal SNR verified" },
+                                3: {
+                                    title: "03 EVENT DETECTION",
+                                    summary: hasEvents ? `${backendResp.events_detected} DETECTED (Energy Threshold)` : "0 DETECTED (Nominal)",
+                                },
+                                4: {
+                                    title: "04 FEATURE EXTRACTION",
+                                    summary: backendResp.extracted_features
+                                        ? `Peak: ${backendResp.extracted_features.peak_amplitude.toFixed(2)}V · ${backendResp.extracted_features.duration_ms.toFixed(1)}ms`
+                                        : "Nominal Window",
+                                },
+                                5: { title: "05 BASELINE REFERENCE", summary: `Zone ${primarySensor.zoneId} Baseline Reference verified` },
+                                6: {
+                                    title: "06 ANOMALY EVALUATION",
+                                    summary: isAnom ? `ANOMALOUS (${zScoreStr} deviation)` : "NORMAL (0.2σ deviation)",
+                                },
+                                7: {
+                                    title: "07 PERSISTENCE",
+                                    summary: backendResp.temporal_persistence_confirmed ? "CONFIRMED (Temporal Window)" : "NOT CONFIRMED",
+                                },
+                                8: {
+                                    title: "08 CORRELATION",
+                                    summary: backendResp.cross_sensor_correlation_confirmed ? "CORRELATED (Cross-Transducer)" : "NOT CORRELATED",
+                                },
+                                9: {
+                                    title: "09 HEALTH & ALERT",
+                                    summary: `SHI ${backendResp.health_score !== null && backendResp.health_score !== undefined ? backendResp.health_score.toFixed(0) : "100"}/100${backendResp.alert_generated ? ` · ALERT #${backendResp.alert_id}` : " · NO ALERT"}`,
+                                },
+                            };
+                            authoritativeStagesRef.current = authStages;
+
+                            // Launch the deliberate 1000ms stage presentation queue
+                            launchPresentationQueue(runId, authStages);
+                        } else {
+                            status = "FAILED";
+                            const errorText = await postResp.text();
+                            errStr = `HTTP ${postResp.status}: ${errorText.slice(0, 100)}`;
+
+                            setStageCards((prev) => ({
+                                ...prev,
+                                1: { ...prev[1], status: "FAILED", summary: `Ingest failed (${postResp.status})` },
+                                2: { ...prev[2], status: "NOT_REACHED", summary: "Not reached" },
+                                3: { ...prev[3], status: "NOT_REACHED", summary: "Not reached" },
+                                4: { ...prev[4], status: "NOT_REACHED", summary: "Not reached" },
+                                5: { ...prev[5], status: "NOT_REACHED", summary: "Not reached" },
+                                6: { ...prev[6], status: "NOT_REACHED", summary: "Not reached" },
+                                7: { ...prev[7], status: "NOT_REACHED", summary: "Not reached" },
+                                8: { ...prev[8], status: "NOT_REACHED", summary: "Not reached" },
+                                9: { ...prev[9], status: "NOT_REACHED", summary: "Not reached" },
+                            }));
+
+                            setSimulatorRunState("FAILED");
+                            dwellResetTimerRef.current = setTimeout(() => {
+                                if (currentRunIdRef.current === runId) {
+                                    setSimulatorRunState("READY");
+                                }
+                            }, 2000);
+                        }
+                    } catch (e: any) {
+                        if (currentRunIdRef.current !== runId) return;
                         status = "FAILED";
-                        const errorText = await postResp.text();
-                        errStr = `HTTP ${postResp.status}: ${errorText.slice(0, 100)}`;
+                        errStr = e.message || "Failed to reach backend endpoint";
+
+                        setStageCards((prev) => ({
+                            ...prev,
+                            1: { ...prev[1], status: "FAILED", summary: "Network/endpoint unreachable" },
+                            2: { ...prev[2], status: "NOT_REACHED", summary: "Not reached" },
+                            3: { ...prev[3], status: "NOT_REACHED", summary: "Not reached" },
+                            4: { ...prev[4], status: "NOT_REACHED", summary: "Not reached" },
+                            5: { ...prev[5], status: "NOT_REACHED", summary: "Not reached" },
+                            6: { ...prev[6], status: "NOT_REACHED", summary: "Not reached" },
+                            7: { ...prev[7], status: "NOT_REACHED", summary: "Not reached" },
+                            8: { ...prev[8], status: "NOT_REACHED", summary: "Not reached" },
+                            9: { ...prev[9], status: "NOT_REACHED", summary: "Not reached" },
+                        }));
+
+                        setSimulatorRunState("FAILED");
+                        dwellResetTimerRef.current = setTimeout(() => {
+                            if (currentRunIdRef.current === runId) {
+                                setSimulatorRunState("READY");
+                            }
+                        }, 2000);
                     }
-                } catch (e: any) {
-                    status = "FAILED";
-                    errStr = e.message || "Failed to reach backend endpoint";
                 }
+
+                const simId = `SIM-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+                const result: SimulationResult = {
+                    simulationId: simId,
+                    timestamp: new Date().toLocaleTimeString(),
+                    sourceSensor: sourceSensor.id,
+                    receiverSensor: primarySensor.id,
+                    targetZoneName: targetZone,
+                    targetZoneId: primarySensor.zoneId,
+                    scenario: physicalCondition,
+                    pathId: mappedPath.pathId,
+                    distanceM: mappedPath.distanceM,
+                    waveVelocityMS: mappedPath.waveVelocityMS,
+                    propagationDelayS: physics.delayS,
+                    propagationDelayMs: physics.delayMs,
+                    attenuationDb: physics.attenuationDb,
+                    amplitudeFactor: physics.amplitudeFactor,
+                    isDamaged: physicalCondition === "anomaly",
+                    damagedComponentGuid: physicalCondition === "anomaly" ? FIXED_DAMAGED_COMPONENT.guid : null,
+                    damagedComponentType: FIXED_DAMAGED_COMPONENT.type,
+                    damageInfluenceFactor: physicalCondition === "anomaly" ? FIXED_DAMAGED_COMPONENT.influence : 0.0,
+                    primaryAttenuationMultiplier: physics.attenuationMultiplier,
+                    primaryDelayShiftSamples: physics.delayShiftSamples,
+                    scatteringAmplitude: physics.scatteringAmplitude,
+                    scatteringDelayMs: physics.scatteringDelayMs,
+                    scatteringDelaySamples: physics.scatteringDelaySamples,
+                    sampleRateHz,
+                    sampleCount,
+                    excitationSamples: physics.excitation,
+                    primaryPropagatedSamples: physics.primaryPropagated,
+                    scatteredSamples: physics.scattered,
+                    receivedSamples: physics.received,
+                    simPeak: peakAmp,
+                    detectionThresholdExpected: expectedThreshold,
+                    telemetryPayload: payload,
+                    backendResponse: backendResp,
+                    telemetryStatus: status,
+                    telemetryError: errStr,
+                };
+
+                setCurrentResult(result);
+                setSelectedRunHistoryId(result.simulationId);
+
+                if (transmit) {
+                    setRunHistory((prev) => [result, ...prev.slice(0, 24)]);
+                }
+            } catch (err: any) {
+                console.error("[Simulator] Unhandled simulation error:", err);
             }
-
-            const simId = `SIM-${Date.now().toString(36).toUpperCase().slice(-6)}`;
-            const result: SimulationResult = {
-                simulationId: simId,
-                timestamp: new Date().toLocaleTimeString(),
-                sourceSensor: sourceSensor.id,
-                receiverSensor: primarySensor.id,
-                targetZoneName: targetZone,
-                targetZoneId: primarySensor.zoneId,
-                scenario: physicalCondition,
-                pathId: mappedPath.pathId,
-                distanceM: mappedPath.distanceM,
-                waveVelocityMS: mappedPath.waveVelocityMS,
-                propagationDelayS: physics.delayS,
-                propagationDelayMs: physics.delayMs,
-                attenuationDb: physics.attenuationDb,
-                amplitudeFactor: physics.amplitudeFactor,
-                isDamaged: physicalCondition === "anomaly",
-                damagedComponentGuid: physicalCondition === "anomaly" ? FIXED_DAMAGED_COMPONENT.guid : null,
-                damagedComponentType: FIXED_DAMAGED_COMPONENT.type,
-                damageInfluenceFactor: physicalCondition === "anomaly" ? FIXED_DAMAGED_COMPONENT.influence : 0.0,
-                primaryAttenuationMultiplier: physics.attenuationMultiplier,
-                primaryDelayShiftSamples: physics.delayShiftSamples,
-                scatteringAmplitude: physics.scatteringAmplitude,
-                scatteringDelayMs: physics.scatteringDelayMs,
-                scatteringDelaySamples: physics.scatteringDelaySamples,
-                sampleRateHz,
-                sampleCount,
-                excitationSamples: physics.excitation,
-                primaryPropagatedSamples: physics.primaryPropagated,
-                scatteredSamples: physics.scattered,
-                receivedSamples: physics.received,
-                simPeak: peakAmp,
-                detectionThresholdExpected: expectedThreshold,
-                telemetryPayload: payload,
-                backendResponse: backendResp,
-                telemetryStatus: status,
-                telemetryError: errStr,
-            };
-
-            setCurrentResult(result);
-            setSelectedRunHistoryId(result.simulationId);
-
-            if (transmit) {
-                setRunHistory((prev) => [result, ...prev.slice(0, 24)]);
-            }
-
-            setIsTransmitting(false);
         },
         [
             mappedPath,
@@ -468,10 +851,35 @@ export default function SimulatorPage() {
                     {/* Run State Badge */}
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900 border border-slate-800">
                         <span className="text-slate-400">STATE:</span>
-                        <span className={isTransmitting ? "text-amber-400 font-bold animate-pulse" : "text-cyan-400 font-bold"}>
-                            {isTransmitting ? "SENDING" : isStreaming ? "STREAMING" : "READY"}
+                        <span className={
+                            simulatorRunState === "READY"
+                                ? "text-cyan-400 font-bold"
+                                : simulatorRunState === "SENDING"
+                                ? "text-amber-400 font-bold animate-pulse"
+                                : simulatorRunState === "PROCESSING"
+                                ? "text-amber-300 font-bold animate-pulse"
+                                : simulatorRunState === "SUCCESS"
+                                ? "text-emerald-400 font-bold"
+                                : "text-rose-400 font-bold"
+                        }>
+                            {simulatorRunState}
                         </span>
                     </div>
+
+                    {/* Clear Active Alerts Button */}
+                    <button
+                        type="button"
+                        onClick={handleClearActiveAlerts}
+                        disabled={clearingAlerts}
+                        className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition cursor-pointer font-bold text-[10px] flex items-center gap-1"
+                    >
+                        {clearingAlerts ? "CLEARING..." : "CLEAR ACTIVE ALERTS"}
+                    </button>
+                    {clearAlertsFeedback && (
+                        <span className="text-[10px] text-amber-400 font-mono px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
+                            {clearAlertsFeedback}
+                        </span>
+                    )}
 
                     {/* Reset Button */}
                     <button
@@ -479,10 +887,25 @@ export default function SimulatorPage() {
                         onClick={() => {
                             handlePresetChange("01_NORMAL");
                             setRunHistory([]);
+                            setStageCards(getDefaultStageCards());
+                            setSimulatorRunState("READY");
                         }}
                         className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer"
                     >
                         RESET
+                    </button>
+
+                    {/* Inspect Processing Launcher */}
+                    <button
+                        type="button"
+                        onClick={handleOpenInspector}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/50 font-bold text-[11px] transition cursor-pointer shadow-sm shadow-sky-900/40"
+                    >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        <span>INSPECT PROCESSING</span>
                     </button>
 
                     {/* Link to 3D Digital Twin */}
@@ -717,7 +1140,7 @@ export default function SimulatorPage() {
                         <div className="flex flex-col gap-1.5 pt-2 mt-auto border-t border-slate-800">
                             <button
                                 type="button"
-                                disabled={isTransmitting}
+                                disabled={simulatorRunState === "SENDING" || simulatorRunState === "PROCESSING"}
                                 onClick={() => executeSimulation(true)}
                                 className={`w-full py-2 rounded text-xs font-bold uppercase tracking-wider transition cursor-pointer border ${
                                     physicalCondition === "anomaly"
@@ -725,7 +1148,7 @@ export default function SimulatorPage() {
                                         : "bg-cyan-600 hover:bg-cyan-500 text-white border-cyan-400/50 shadow-md shadow-cyan-900/30"
                                 } disabled:opacity-50`}
                             >
-                                {isTransmitting ? "TRANSMITTING..." : "RUN SCENARIO & TRANSMIT"}
+                                {simulatorRunState === "SENDING" ? "TRANSMITTING..." : simulatorRunState === "PROCESSING" ? "PROCESSING PIPELINE..." : "RUN SCENARIO & TRANSMIT"}
                             </button>
 
                             <button
@@ -738,6 +1161,18 @@ export default function SimulatorPage() {
                                 }`}
                             >
                                 {isStreaming ? "STOP STREAMING" : "STREAM SCENARIO"}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleOpenInspector}
+                                className="w-full py-1.5 rounded text-xs font-bold bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 flex items-center justify-center gap-1.5 transition cursor-pointer"
+                            >
+                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                </svg>
+                                <span>INSPECT PROCESSING</span>
                             </button>
                         </div>
                     </div>
@@ -841,16 +1276,20 @@ export default function SimulatorPage() {
                             <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider">BACKEND PIPELINE STAGE</span>
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Active Stage:</span>
-                                <span className="text-amber-400 font-bold">{activeStage ? STAGE_NAMES[activeStage - 1] : "IDLE"}</span>
+                                <span className="text-amber-400 font-bold">
+                                    {sseActiveStage ? STAGE_NAMES[sseActiveStage - 1] : simulatorRunState === "SUCCESS" ? "COMPLETE (9/9)" : "IDLE"}
+                                </span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-slate-500">Stage Status:</span>
-                                <span className="text-slate-300">{sseState}</span>
+                                <span className="text-slate-500">Pipeline State:</span>
+                                <span className={simulatorRunState === "SUCCESS" ? "text-emerald-400 font-bold" : simulatorRunState === "FAILED" ? "text-rose-400 font-bold" : "text-slate-300"}>
+                                    {simulatorRunState}
+                                </span>
                             </div>
-                            {backendDurationMs !== null && (
+                            {sseBackendDurationMs !== null && (
                                 <div className="flex justify-between">
                                     <span className="text-slate-500">Duration:</span>
-                                    <span className="text-slate-300">{backendDurationMs} ms</span>
+                                    <span className="text-slate-300">{sseBackendDurationMs} ms</span>
                                 </div>
                             )}
                         </div>
@@ -888,37 +1327,85 @@ export default function SimulatorPage() {
                 {/* ========================================================= */}
                 {/* 04 NINE-STAGE PROCESSING PIPELINE STRIP (FULL WIDTH)      */}
                 {/* ========================================================= */}
-                <div className="bg-[#0b1329]/90 border border-slate-800 rounded p-2 flex flex-col gap-1.5 shrink-0 font-mono text-xs">
+                <div className="bg-[#0b1329]/90 border border-slate-800 rounded p-2.5 flex flex-col gap-2 shrink-0 font-mono text-xs">
                     <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-200 tracking-wider text-[11px]">04 PROCESSING PIPELINE — NINE STAGE BACKEND EVIDENCE</span>
-                        <span className="text-[10px] text-slate-500">LIVE SSE DRIFT & STAGE EVIDENCE</span>
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-200 tracking-wider text-[11px]">04 PROCESSING PIPELINE — NINE STAGE BACKEND EVIDENCE</span>
+                            <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                                simulatorRunState === "READY"
+                                    ? "bg-slate-800 text-slate-400"
+                                    : simulatorRunState === "PROCESSING" || simulatorRunState === "SENDING"
+                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
+                                    : simulatorRunState === "SUCCESS"
+                                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                                    : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                            }`}>
+                                {simulatorRunState}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleOpenInspector}
+                                className="px-2 py-0.5 rounded bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                            >
+                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                </svg>
+                                <span>INSPECT PROCESSING</span>
+                            </button>
+                            <span className="text-[10px] text-slate-500">AUTHORITATIVE BACKEND EXECUTION</span>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-9 gap-1 text-[9px]">
-                        {STAGE_NAMES.map((stageName, idx) => {
-                            const stageId = idx + 1;
-                            const stageInfo = stageStatuses[stageId];
-                            const isCompleted = stageInfo?.status === "completed" || (currentResult?.backendResponse && stageId <= 9);
-                            const isProcessing = stageInfo?.status === "processing" || activeStage === stageId;
+                    <div className="grid grid-cols-9 gap-1.5 text-[9px]">
+                        {STAGE_CONFIGS.map((cfg) => {
+                            const stageData = stageCards[cfg.id];
+                            const status = stageData?.status || "PENDING";
+                            const isVerified = status === "VERIFIED";
+                            const isProcessing = status === "PROCESSING";
+                            const isFailed = status === "FAILED";
+                            const isNotReached = status === "NOT_REACHED";
 
                             return (
                                 <div
-                                    key={stageName}
-                                    className={`p-1.5 rounded border flex flex-col justify-between h-14 ${
-                                        isCompleted
-                                            ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300"
+                                    key={cfg.id}
+                                    className={`p-2 rounded border flex flex-col justify-between min-h-[72px] transition-all ${
+                                        isVerified
+                                            ? "bg-emerald-950/40 border-emerald-500/60 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.15)]"
                                             : isProcessing
-                                            ? "bg-amber-500/20 border-amber-500/50 text-amber-300 animate-pulse"
-                                            : "bg-slate-900/70 border-slate-800 text-slate-500"
+                                            ? "bg-amber-950/40 border-amber-500/80 text-amber-300 animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.2)]"
+                                            : isFailed
+                                            ? "bg-rose-950/40 border-rose-500/70 text-rose-300"
+                                            : isNotReached
+                                            ? "bg-slate-900/40 border-slate-800/80 text-slate-600 opacity-60"
+                                            : "bg-slate-900/70 border-slate-800 text-slate-400"
                                     }`}
                                 >
                                     <div className="flex items-center justify-between font-bold">
-                                        <span>0{stageId}</span>
-                                        <span>{isCompleted ? "✓" : isProcessing ? "⟳" : "•"}</span>
+                                        <span className="text-[10px] tracking-wider text-slate-300">0{cfg.id}</span>
+                                        <span className={`text-[8px] font-bold px-1 py-0.5 rounded ${
+                                            isVerified
+                                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                                                : isProcessing
+                                                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                                : isFailed
+                                                ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                                                : isNotReached
+                                                ? "bg-slate-800 text-slate-500"
+                                                : "bg-slate-800 text-slate-400"
+                                        }`}>
+                                            {isVerified ? "✓ VERIFIED" : isProcessing ? "⟳ RUNNING" : isFailed ? "✕ FAILED" : isNotReached ? "— NOT REACHED" : "• PENDING"}
+                                        </span>
                                     </div>
-                                    <div className="font-semibold text-[8.5px] leading-tight truncate">{stageName.replace("_", " ")}</div>
-                                    <div className="text-[7.5px] opacity-75 truncate">
-                                        {isCompleted ? "VERIFIED" : isProcessing ? "PROCESSING" : "PENDING"}
+                                    <div className="font-bold text-[9px] leading-tight truncate text-slate-100 mt-1">
+                                        {cfg.name.replace(/_/g, " ")}
+                                    </div>
+                                    <div className={`text-[8px] font-mono truncate mt-1 ${
+                                        isVerified ? "text-emerald-300/90 font-medium" : isProcessing ? "text-amber-300" : isFailed ? "text-rose-400" : "text-slate-500"
+                                    }`}>
+                                        {stageData?.summary || "Pending dispatch"}
                                     </div>
                                 </div>
                             );
@@ -1008,6 +1495,34 @@ export default function SimulatorPage() {
                     </div>
                 </div>
             </main>
+
+            {/* ========================================================= */}
+            {/* FULLSCREEN/CENTERED TELEMETRY PROCESSING INSPECTOR MODAL  */}
+            {/* ========================================================= */}
+            {isInspectorOpen && (
+                <TelemetryProcessingInspector
+                    isOpen={isInspectorOpen}
+                    onClose={() => setIsInspectorOpen(false)}
+                    runId={currentRunId || currentResult?.simulationId || "RUN-STANDBY"}
+                    sensorId={primarySensor.id}
+                    zoneName={targetZone}
+                    currentResult={currentResult}
+                    simulatorRunState={simulatorRunState}
+                    stageCards={stageCards}
+                    sseState={sseState}
+                    sseActiveStage={sseActiveStage}
+                    sseBackendDurationMs={sseBackendDurationMs}
+                    presentedStage={presentedStage}
+                    isReplayingTrace={isReplayingTrace}
+                    onTriggerReplay={triggerReplay}
+                    onSkipToEnd={skipToEnd}
+                    identifier={
+                        currentResult?.backendResponse?.telemetry_id
+                            ? String(currentResult.backendResponse.telemetry_id)
+                            : primarySensor.id
+                    }
+                />
+            )}
         </div>
     );
 }

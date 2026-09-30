@@ -13,7 +13,10 @@ import {
     ZoneTrendResponse,
 } from "@/types/api";
 
-const API_BASE = "/api/v1";
+const API_BASE =
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_BASE_URL)
+        ? process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/+$/, "")
+        : "/api/v1";
 
 async function apiFetch<T>(
     endpoint: string,
@@ -69,6 +72,12 @@ export const api = {
 
     getAlerts: (): Promise<AlertResponse[]> =>
         apiFetch<AlertResponse[]>("/alerts"),
+
+    clearActiveAlerts: (): Promise<{ cleared_count: number }> =>
+        apiFetch<{ cleared_count: number }>("/alerts/clear-active", {
+            method: "POST",
+        }),
+
 
     getLatestTelemetry: (sensorId?: string): Promise<TelemetryLatestResponse | null> =>
         apiFetch<TelemetryLatestResponse | null>(

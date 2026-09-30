@@ -322,6 +322,11 @@ def parse_arguments() -> argparse.Namespace:
         default=5.0,
         help="HTTP request timeout in seconds (default: 5.0)",
     )
+    parser.add_argument(
+        "--clear-active-alerts",
+        action="store_true",
+        help="Clear all active backend alerts (transition to RESOLVED) and exit",
+    )
 
     return parser.parse_args()
 
@@ -343,6 +348,15 @@ def main() -> int:
         endpoint=config.telemetry_endpoint,
         timeout_seconds=config.timeout_seconds,
     )
+
+    if args.clear_active_alerts:
+        print("\n[OPERATOR ACTION] Requesting backend to clear active alerts...")
+        res = client.clear_active_alerts()
+        if "error" in res:
+            print(f"  FAILED: {res['error']}")
+            return 1
+        print(f"  SUCCESS: Cleared {res.get('cleared_count', 0)} active alerts.")
+        return 0
 
     if args.mode == "correlation":
         run_correlation_demo(
@@ -371,6 +385,7 @@ def main() -> int:
 
     print("\n[INFO] Simulation session finished.")
     return 0
+
 
 
 if __name__ == "__main__":

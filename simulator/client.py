@@ -87,7 +87,7 @@ class TelemetryClient:
 
     def __init__(
         self,
-        backend_url: str = "http://localhost:8000",
+        backend_url: str = "http://127.0.0.1:8000",
         endpoint: str = "/api/v1/telemetry",
         timeout_seconds: float = 5.0,
     ) -> None:
@@ -186,6 +186,22 @@ class TelemetryClient:
                 status_code=0,
                 error_message=err_msg,
             )
+
+    def clear_active_alerts(self) -> Dict[str, Any]:
+        """POST /api/v1/alerts/clear-active to transition active alerts to resolved."""
+        full_url = f"{self.backend_url}/api/v1/alerts/clear-active"
+        req = urllib.request.Request(
+            url=full_url,
+            headers={"Accept": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
+                body_bytes = response.read()
+                return json.loads(body_bytes.decode("utf-8"))
+        except Exception as exc:
+            return {"error": str(exc), "cleared_count": 0}
+
 
 
 def main() -> None:

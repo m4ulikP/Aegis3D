@@ -27,3 +27,14 @@ def list_alerts(
         limit=limit,
     )
     return [AlertResponse.model_validate(alt) for alt in alerts]
+
+
+@router.post("/clear-active", status_code=status.HTTP_200_OK)
+def clear_active_alerts(
+    db: Session = Depends(get_db),
+) -> dict:
+    """Clear all currently active system alerts (transitions to RESOLVED status)."""
+    service = MonitoringService(db)
+    cleared_count = service.clear_active_alerts()
+    return {"cleared_count": cleared_count}
+

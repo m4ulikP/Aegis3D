@@ -91,24 +91,28 @@ class TrendService:
             .all()
         )
 
+        baseline = self.baseline_repository.get_latest_for_zone(zone_id)
+
         event_items: List[Dict[str, Any]] = []
         for evt in events:
-            try:
-                evidence = self.correlation_service.evaluate_event_evidence(
-                    event_id=evt.id,
-                    window_duration_seconds=analysis_window_seconds / 2.0 if analysis_window_seconds > 0 else 300.0,
-                )
-                is_anom = evidence.is_anomalous
-                is_pers = evidence.is_persistent
-                is_cross = evidence.is_cross_sensor
-            except BaselineNotFoundError:
+            if baseline and evt.magnitude is not None and evt.energy is not None:
+                try:
+                    anom_res = self.anomaly_service.analyze_event(event=evt, baseline=baseline)
+                    is_anom = anom_res.is_anomalous
+                except Exception:
+                    is_anom = False
+            else:
                 is_anom = False
-                is_pers = False
-                is_cross = False
-            except Exception:
-                is_anom = False
-                is_pers = False
-                is_cross = False
+
+            is_pers = (
+                evt.metadata.get("is_persistent", False)
+                if isinstance(evt.metadata, dict)
+                else False
+            )
+            is_cross = bool(
+                evt.correlation_id
+                or (isinstance(evt.metadata, dict) and evt.metadata.get("is_cross_sensor", False))
+            )
 
             event_items.append(
                 {

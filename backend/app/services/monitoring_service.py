@@ -266,6 +266,24 @@ class MonitoringService:
             correlated_groups=group_schemas,
         )
 
+    def clear_active_alerts(self) -> int:
+        """
+        Transition all currently ACTIVE alerts to RESOLVED status.
+        Does not delete historical alert records, events, traces, or health snapshots.
+        Returns the count of cleared active alerts.
+        """
+        active_alerts = (
+            self.db.query(Alert)
+            .filter(Alert.status == AlertStatus.ACTIVE)
+            .all()
+        )
+        now = datetime.now(timezone.utc)
+        for alert in active_alerts:
+            alert.status = AlertStatus.RESOLVED
+            alert.resolved_at = now
+        self.db.commit()
+        return len(active_alerts)
+
     def get_alerts(
         self,
         zone_id: Optional[int] = None,
@@ -284,6 +302,7 @@ class MonitoringService:
             query = query.filter(Alert.severity == severity)
 
         return query.order_by(Alert.timestamp.desc()).limit(limit).all()
+
 
     def get_health_summary(self) -> HealthSummaryResponse:
         """Calculate high-level dashboard health summary across all zones."""
